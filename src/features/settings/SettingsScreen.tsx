@@ -1,7 +1,8 @@
-import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@features/auth/AuthContext';
+import { disableAppLock, enableAppLock, isAppLockEnabled, isBiometrySupported } from '@features/auth/appLock';
 import { ThemePreference, useTheme } from '@shared/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
@@ -14,6 +15,22 @@ export function SettingsScreen() {
   const { credentials, logout } = useAuth();
   const { colors, spacing, radii, typography, preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
+  const [biometrySupported, setBiometrySupported] = useState(false);
+  const [appLockEnabled, setAppLockEnabled] = useState(false);
+
+  useEffect(() => {
+    isBiometrySupported().then(setBiometrySupported);
+    isAppLockEnabled().then(setAppLockEnabled);
+  }, []);
+
+  const onToggleAppLock = async (value: boolean) => {
+    if (value) {
+      await enableAppLock();
+    } else {
+      await disableAppLock();
+    }
+    setAppLockEnabled(value);
+  };
 
   const confirmLogout = () => {
     Alert.alert('Cerrar sesión', '¿Seguro que quieres desconectarte de este servidor?', [
@@ -72,6 +89,23 @@ export function SettingsScreen() {
           })}
         </View>
 
+        {biometrySupported && (
+          <>
+            <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+              SEGURIDAD
+            </Text>
+            <View
+              style={[
+                styles.card,
+                styles.row,
+                { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
+              ]}>
+              <Text style={[typography.body, { color: colors.label }]}>Bloqueo con biometría</Text>
+              <Switch value={appLockEnabled} onValueChange={onToggleAppLock} />
+            </View>
+          </>
+        )}
+
         <TouchableOpacity
           style={[styles.card, styles.logoutCard, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginTop: spacing.lg }]}
           onPress={confirmLogout}>
@@ -85,6 +119,7 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   card: { padding: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logoutCard: { alignItems: 'center' },
   segmented: { flexDirection: 'row', padding: 4 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8 },

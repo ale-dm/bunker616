@@ -25,6 +25,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [showOverlay, setShowOverlay] = useState(true);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [dimIndex, setDimIndex] = useState(0);
+  const [incognito, setIncognito] = useState(false);
 
   const bookQuery = useQuery({
     queryKey: ['book', bookId],
@@ -81,7 +82,9 @@ export function ReaderScreen({ route, navigation }: Props) {
         onPageSelected={(e: PagerViewOnPageSelectedEvent) => {
           const index = e.nativeEvent.position;
           setCurrentIndex(index);
-          reportPage(index);
+          if (!incognito) {
+            reportPage(index);
+          }
         }}>
         {pages.map(page => (
           <View key={page.number} collapsable={false}>
@@ -110,6 +113,14 @@ export function ReaderScreen({ route, navigation }: Props) {
             <Text style={styles.overlayTitle} numberOfLines={1}>
               {title}
             </Text>
+            <TouchableOpacity
+              onPress={() => setIncognito(v => !v)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.incognitoButton}>
+              <Text style={[styles.incognitoText, incognito && styles.incognitoTextActive]}>
+                {incognito ? 'Incógnito ●' : 'Incógnito'}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.pageCounter}>
               {activeIndex + 1} / {pages.length}
             </Text>
@@ -165,6 +176,9 @@ const styles = StyleSheet.create({
   backButton: { color: '#fff', fontSize: 16, marginRight: 12 },
   overlayTitle: { color: '#fff', fontSize: 14, flex: 1 },
   pageCounter: { color: '#c7c7d1', fontSize: 13, marginLeft: 12 },
+  incognitoButton: { paddingHorizontal: 8 },
+  incognitoText: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
+  incognitoTextActive: { color: '#FF9500' },
   overlayBottom: {
     position: 'absolute',
     bottom: 0,

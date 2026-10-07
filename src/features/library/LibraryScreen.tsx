@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,8 +19,12 @@ import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
 import { SeriesGridItem } from './components/SeriesGridItem';
+import { SeriesListItem } from './components/SeriesListItem';
 
 const PAGE_SIZE = 24;
+const VIEW_MODE_KEY = 'bunker616.libraryViewMode';
+
+type ViewMode = 'grid' | 'list';
 
 const SORT_OPTIONS: { value: SeriesSort; label: string }[] = [
   { value: 'title', label: 'Título' },
@@ -33,6 +38,21 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const [libraryId, setLibraryId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SeriesSort>('title');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  useEffect(() => {
+    AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
+      if (stored === 'grid' || stored === 'list') {
+        setViewMode(stored);
+      }
+    });
+  }, []);
+
+  const toggleViewMode = () => {
+    const next = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(next);
+    AsyncStorage.setItem(VIEW_MODE_KEY, next);
+  };
 
   const librariesQuery = useQuery({
     queryKey: ['libraries'],
@@ -117,38 +137,55 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
         />
       )}
 
-      <View style={[styles.sortRow, { paddingHorizontal: spacing.lg, marginTop: spacing.sm }]}>
-        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginRight: spacing.sm }]}>
-          Ordenar:
-        </Text>
-        {SORT_OPTIONS.map(option => {
-          const active = sort === option.value;
-          return (
-            <TouchableOpacity
-              key={option.value}
-              onPress={() => setSort(option.value)}
-              style={{ marginRight: spacing.md }}>
-              <Text
-                style={[
-                  typography.footnote,
-                  { color: active ? colors.accent : colors.secondaryLabel, fontWeight: active ? '700' : '400' },
-                ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View
+        style={[
+          styles.sortRow,
+          { paddingHorizontal: spacing.lg, marginTop: spacing.sm, justifyContent: 'space-between' },
+        ]}>
+        <View style={styles.sortRow}>
+          <Text style={[typography.footnote, { color: colors.secondaryLabel, marginRight: spacing.sm }]}>
+            Ordenar:
+          </Text>
+          {SORT_OPTIONS.map(option => {
+            const active = sort === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => setSort(option.value)}
+                style={{ marginRight: spacing.md }}>
+                <Text
+                  style={[
+                    typography.footnote,
+                    { color: active ? colors.accent : colors.secondaryLabel, fontWeight: active ? '700' : '400' },
+                  ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <TouchableOpacity onPress={toggleViewMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
+            {viewMode === 'grid' ? 'Ver en lista' : 'Ver en grid'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {seriesQuery.isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : (
         <FlatList
+          key={viewMode}
           data={series}
           keyExtractor={item => item.id}
-          numColumns={3}
-          columnWrapperStyle={styles.row}
+          numColumns={viewMode === 'grid' ? 3 : 1}
+          columnWrapperStyle={viewMode === 'grid' ? styles.row : undefined}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl }}
+          ItemSeparatorComponent={
+            viewMode === 'list'
+              ? () => <View style={{ height: 1, backgroundColor: colors.separator }} />
+              : undefined
+          }
           refreshControl={
             <RefreshControl
               refreshing={seriesQuery.isRefetching && !seriesQuery.isFetchingNextPage}
@@ -162,17 +199,18 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
               seriesQuery.fetchNextPage();
             }
           }}
-          renderItem={({ item }) => (
-            <SeriesGridItem
-              series={item}
-              onPress={() =>
-                navigation.navigate('Series', {
-                  seriesId: item.id,
-                  title: item.metadata.title || item.name,
-                })
-              }
-            />
-          )}
+          renderItem={({ item }) => {
+            const onPress = () =>
+              navigation.navigate('Series', {
+                seriesId: item.id,
+                title: item.metadata.title || item.name,
+              });
+            return viewMode === 'grid' ? (
+              <SeriesGridItem series={item} onPress={onPress} />
+            ) : (
+              <SeriesListItem series={item} onPress={onPress} />
+            );
+          }}
           ListEmptyComponent={<EmptyState message="No se encontraron series." />}
           ListFooterComponent={
             seriesQuery.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : undefined

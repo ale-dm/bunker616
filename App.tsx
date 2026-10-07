@@ -1,11 +1,14 @@
 import React from 'react';
 import { Providers } from '@app/Providers';
+import { AppLockGate } from '@features/auth/AppLockGate';
 import { RootNavigator } from '@navigation/RootNavigator';
 
 function App() {
   return (
     <Providers>
-      <RootNavigator />
+      <AppLockGate>
+        <RootNavigator />
+      </AppLockGate>
     </Providers>
   );
 }
