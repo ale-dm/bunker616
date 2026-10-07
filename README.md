@@ -53,6 +53,19 @@ cd ios && pod install && cd ..
 npx react-native run-ios
 ```
 
+## Releases (APK vía GitHub Actions)
+
+Cada tag `vX.Y.Z` pusheado dispara `.github/workflows/release.yml`, que compila un APK release (`arm64-v8a`, minificado con R8) y lo adjunta automáticamente a un GitHub Release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+También se puede lanzar manualmente desde la pestaña Actions (`workflow_dispatch`) sin crear un tag; en ese caso el APK queda como artefacto del run, sin adjuntarse a ningún Release.
+
+La firma usa la keystore de debug incluida en el repo (`android/app/debug.keystore`), así que Android seguirá avisando de "desarrollador no verificado" al instalar — es el mismo APK que si lo compilaras en local, solo que generado en CI.
+
 ## Notas sobre la API de Komga
 
 La app usa autenticación HTTP Basic en cada petición (no sesión/cookie), compatible con cualquier versión reciente de Komga sin necesidad de generar un API Key manualmente. Si tu servidor usa HTTP (no HTTPS) en tu red local, está habilitado el tráfico "cleartext" en Android para que funcione sin configuración adicional.
