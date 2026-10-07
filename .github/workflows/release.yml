@@ -28,8 +28,45 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Cache Android SDK
+        id: android-sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/android-sdk
+          key: android-sdk-37.0-ndk27.1.12297006
+
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        if: steps.android-sdk-cache.outputs.cache-hit != 'true'
+        # android-actions/setup-android intenta instalar el paquete legacy
+        # "tools", que Google ya retiró del repositorio del SDK, y falla con
+        # exit code 1. Se instala a mano, pidiendo solo lo que el proyecto
+        # necesita (ver android/build.gradle para las versiones exactas).
+        run: |
+          SDK_ROOT="$HOME/android-sdk"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          curl -sS -o cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
+          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+          rm cmdline-tools.zip
+
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses --sdk_root="$SDK_ROOT" > /dev/null
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" \
+            "platform-tools" \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.22.1"
+
+      - name: Export Android SDK env vars
+        # Separado del paso anterior para que se ejecute también cuando la
+        # cache de ~/android-sdk tiene un hit (y el paso de arriba se salta).
+        run: |
+          SDK_ROOT="$HOME/android-sdk"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
       - name: Cache Gradle
         uses: actions/cache@v4
