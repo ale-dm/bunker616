@@ -9,9 +9,10 @@ import { useTheme } from '@shared/theme';
 interface Props {
   book: Book;
   onPress: () => void;
+  onToggleRead: () => void;
 }
 
-export function BookListItem({ book, onPress }: Props) {
+export function BookListItem({ book, onPress, onToggleRead }: Props) {
   const { credentials } = useAuth();
   const { colors, radii, spacing, typography } = useTheme();
   if (!credentials) {
@@ -45,6 +46,21 @@ export function BookListItem({ book, onPress }: Props) {
           </View>
         )}
       </View>
+      <TouchableOpacity
+        onPress={onToggleRead}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={[
+          styles.readToggle,
+          {
+            borderRadius: radii.pill,
+            borderColor: isRead ? colors.success : colors.separator,
+            backgroundColor: isRead ? colors.success : 'transparent',
+          },
+        ]}>
+        <Text style={{ color: isRead ? '#FFFFFF' : colors.tertiaryLabel, fontSize: 14, fontWeight: '700' }}>
+          ✓
+        </Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -56,4 +72,12 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%' },
+  readToggle: {
+    width: 28,
+    height: 28,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
 });

@@ -17,7 +17,8 @@ export function SeriesGridItem({ series, onPress }: Props) {
   if (!credentials) {
     return null;
   }
-  const unread = series.booksUnreadCount + series.booksInProgressCount;
+  const hasProgress = series.booksInProgressCount > 0;
+  const badgeCount = hasProgress ? series.booksInProgressCount : series.booksUnreadCount;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
@@ -28,7 +29,7 @@ export function SeriesGridItem({ series, onPress }: Props) {
             { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground },
           ]}>
           <CoverImage uri={seriesThumbnailUrl(credentials.baseUrl, series.id)} style={styles.cover} />
-          <Badge count={unread} />
+          <Badge count={badgeCount} tone={hasProgress ? 'progress' : 'accent'} />
         </View>
       </View>
       <Text

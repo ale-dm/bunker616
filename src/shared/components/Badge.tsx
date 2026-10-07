@@ -4,15 +4,17 @@ import { useTheme } from '@shared/theme';
 
 interface Props {
   count: number;
+  tone?: 'accent' | 'progress';
 }
 
-export function Badge({ count }: Props) {
+export function Badge({ count, tone = 'accent' }: Props) {
   const { colors, radii } = useTheme();
   if (count <= 0) {
     return null;
   }
+  const backgroundColor = tone === 'progress' ? colors.progress : colors.accent;
   return (
-    <View style={[styles.badge, { backgroundColor: colors.accent, borderRadius: radii.pill }]}>
+    <View style={[styles.badge, { backgroundColor, borderRadius: radii.pill }]}>
       <Text style={styles.text}>{count > 99 ? '99+' : count}</Text>
     </View>
   );

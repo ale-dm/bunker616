@@ -13,6 +13,10 @@ import { useReaderProgress } from './hooks/useReaderProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
 
+// No hay un slider real (evita añadir una nueva dependencia nativa solo
+// para esto): se simula el brillo atenuando la pantalla con una capa negra.
+const DIM_LEVELS = [0, 0.15, 0.35, 0.55, 0.75];
+
 export function ReaderScreen({ route, navigation }: Props) {
   const { bookId, title } = route.params;
   const { api, credentials } = useAuth();
@@ -20,6 +24,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const pagerRef = useRef<PagerView>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const [dimIndex, setDimIndex] = useState(0);
 
   const bookQuery = useQuery({
     queryKey: ['book', bookId],
@@ -89,6 +94,13 @@ export function ReaderScreen({ route, navigation }: Props) {
         ))}
       </PagerView>
 
+      {DIM_LEVELS[dimIndex] > 0 && (
+        <View
+          pointerEvents="none"
+          style={[styles.dimOverlay, { opacity: DIM_LEVELS[dimIndex] }]}
+        />
+      )}
+
       {showOverlay && (
         <>
           <View style={[styles.overlayTop, { paddingTop: insets.top + 8 }]}>
@@ -103,6 +115,23 @@ export function ReaderScreen({ route, navigation }: Props) {
             </Text>
           </View>
           <View style={[styles.overlayBottom, { paddingBottom: insets.bottom + 8 }]}>
+            <View style={styles.brightnessRow}>
+              <Text style={styles.brightnessLabel}>Brillo</Text>
+              {DIM_LEVELS.map((level, index) => (
+                <TouchableOpacity
+                  key={level}
+                  onPress={() => setDimIndex(index)}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  style={[
+                    styles.brightnessDot,
+                    {
+                      backgroundColor: `rgba(255,255,255,${1 - level * 0.8})`,
+                      borderWidth: dimIndex === index ? 2 : 0,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
             </View>
@@ -152,4 +181,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: '#5865f2' },
+  dimOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+  },
+  brightnessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  brightnessLabel: { color: '#c7c7d1', fontSize: 12, marginRight: 10 },
+  brightnessDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderColor: '#5865f2',
+    marginRight: 8,
+  },
 });

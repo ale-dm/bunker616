@@ -1,8 +1,13 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ColorPalette, darkColors, lightColors } from './colors';
 import { radii, spacing } from './spacing';
 import { typography } from './typography';
+
+export type ThemePreference = 'system' | 'light' | 'dark';
+
+const THEME_PREFERENCE_KEY = 'bunker616.themePreference';
 
 export interface Theme {
   colors: ColorPalette;
@@ -10,13 +15,30 @@ export interface Theme {
   radii: typeof radii;
   typography: typeof typography;
   isDark: boolean;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
 }
 
 const ThemeContext = createContext<Theme | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const systemScheme = useColorScheme();
+  const [preference, setPreferenceState] = useState<ThemePreference>('system');
+
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_PREFERENCE_KEY).then(stored => {
+      if (stored === 'light' || stored === 'dark' || stored === 'system') {
+        setPreferenceState(stored);
+      }
+    });
+  }, []);
+
+  const setPreference = useCallback((next: ThemePreference) => {
+    setPreferenceState(next);
+    AsyncStorage.setItem(THEME_PREFERENCE_KEY, next);
+  }, []);
+
+  const isDark = preference === 'system' ? systemScheme === 'dark' : preference === 'dark';
 
   const theme = useMemo<Theme>(
     () => ({
@@ -25,8 +47,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       radii,
       typography,
       isDark,
+      preference,
+      setPreference,
     }),
-    [isDark],
+    [isDark, preference, setPreference],
   );
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;

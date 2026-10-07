@@ -12,6 +12,7 @@ export interface ColorPalette {
   accent: string;
   danger: string;
   success: string;
+  progress: string;
   overlay: string;
 }
 
@@ -27,6 +28,7 @@ export const lightColors: ColorPalette = {
   accent: '#007AFF',
   danger: '#FF3B30',
   success: '#34C759',
+  progress: '#FF9500',
   overlay: 'rgba(0,0,0,0.6)',
 };
 
@@ -42,5 +44,6 @@ export const darkColors: ColorPalette = {
   accent: '#0A84FF',
   danger: '#FF453A',
   success: '#30D158',
+  progress: '#FF9F0A',
   overlay: 'rgba(0,0,0,0.75)',
 };

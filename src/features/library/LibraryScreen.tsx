@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LibraryScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { getLibraries, getSeries } from '@shared/api/komga';
+import { getLibraries, getSeries, SeriesSort } from '@shared/api/komga';
 import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
@@ -20,12 +21,18 @@ import { SeriesGridItem } from './components/SeriesGridItem';
 
 const PAGE_SIZE = 24;
 
+const SORT_OPTIONS: { value: SeriesSort; label: string }[] = [
+  { value: 'title', label: 'Título' },
+  { value: 'recent', label: 'Recientes' },
+];
+
 export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const { api } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const [libraryId, setLibraryId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SeriesSort>('title');
 
   const librariesQuery = useQuery({
     queryKey: ['libraries'],
@@ -34,13 +41,18 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   });
 
   const seriesQuery = useInfiniteQuery({
-    queryKey: ['series', libraryId, search],
+    queryKey: ['series', libraryId, search, sort],
     queryFn: ({ pageParam = 0 }) =>
-      getSeries(api!, { libraryId, search, page: pageParam, size: PAGE_SIZE }),
+      getSeries(api!, { libraryId, search, sort, page: pageParam, size: PAGE_SIZE }),
     enabled: !!api,
     initialPageParam: 0,
     getNextPageParam: lastPage => (lastPage.last ? undefined : lastPage.number + 1),
   });
+
+  const handleRefresh = () => {
+    librariesQuery.refetch();
+    seriesQuery.refetch();
+  };
 
   const series: Series[] = useMemo(
     () => seriesQuery.data?.pages.flatMap(p => p.content) ?? [],
@@ -105,6 +117,29 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
         />
       )}
 
+      <View style={[styles.sortRow, { paddingHorizontal: spacing.lg, marginTop: spacing.sm }]}>
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginRight: spacing.sm }]}>
+          Ordenar:
+        </Text>
+        {SORT_OPTIONS.map(option => {
+          const active = sort === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              onPress={() => setSort(option.value)}
+              style={{ marginRight: spacing.md }}>
+              <Text
+                style={[
+                  typography.footnote,
+                  { color: active ? colors.accent : colors.secondaryLabel, fontWeight: active ? '700' : '400' },
+                ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {seriesQuery.isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : (
@@ -114,6 +149,13 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
           numColumns={3}
           columnWrapperStyle={styles.row}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl }}
+          refreshControl={
+            <RefreshControl
+              refreshing={seriesQuery.isRefetching && !seriesQuery.isFetchingNextPage}
+              onRefresh={handleRefresh}
+              tintColor={colors.accent}
+            />
+          }
           onEndReachedThreshold={0.5}
           onEndReached={() => {
             if (seriesQuery.hasNextPage && !seriesQuery.isFetchingNextPage) {
@@ -144,6 +186,7 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   search: { paddingHorizontal: 14, paddingVertical: 10 },
+  sortRow: { flexDirection: 'row', alignItems: 'center' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, marginRight: 8 },
   row: { justifyContent: 'space-between' },
   loader: { marginTop: 40 },
