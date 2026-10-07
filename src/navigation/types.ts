@@ -3,6 +3,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type TabParamList = {
+  HomeTab: undefined;
   LibraryTab: undefined;
   SettingsTab: undefined;
 };
@@ -12,6 +13,7 @@ export type RootStackParamList = {
   Series: { seriesId: string; title: string };
   Reader: { bookId: string; title: string; seriesId: string };
   Collection: { collectionId: string; title: string };
+  ReadList: { readListId: string; title: string };
   AddServer: undefined;
 };
 
@@ -19,6 +21,11 @@ export type RootStackParamList = {
 // a 'Series', que vive un nivel arriba en el Stack.Navigator raíz.
 export type LibraryScreenProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'LibraryTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export type HomeScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, 'HomeTab'>,
   NativeStackScreenProps<RootStackParamList>
 >;
 

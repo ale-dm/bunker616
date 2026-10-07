@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -14,7 +15,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LibraryScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { getCollections, getLibraries, getSeries, SeriesSort } from '@shared/api/komga';
+import {
+  buildSeriesSearchQuery,
+  getCollections,
+  getLibraries,
+  getReadLists,
+  getSeries,
+  SeriesSearchFilters,
+  SeriesSort,
+} from '@shared/api/komga';
 import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
@@ -31,6 +40,14 @@ const SORT_OPTIONS: { value: SeriesSort; label: string }[] = [
   { value: 'recent', label: 'Recientes' },
 ];
 
+const STATUS_OPTIONS: { value: SeriesSearchFilters['status']; label: string }[] = [
+  { value: undefined, label: 'Cualquiera' },
+  { value: 'ongoing', label: 'En curso' },
+  { value: 'ended', label: 'Terminada' },
+  { value: 'hiatus', label: 'En pausa' },
+  { value: 'abandoned', label: 'Abandonada' },
+];
+
 export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const { api } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
@@ -39,6 +56,41 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SeriesSort>('title');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [showFilters, setShowFilters] = useState(false);
+  const [author, setAuthor] = useState('');
+  const [genre, setGenre] = useState('');
+  const [status, setStatus] = useState<SeriesSearchFilters['status']>(undefined);
+  const [draftAuthor, setDraftAuthor] = useState('');
+  const [draftGenre, setDraftGenre] = useState('');
+  const [draftStatus, setDraftStatus] = useState<SeriesSearchFilters['status']>(undefined);
+
+  const hasActiveFilters = !!author || !!genre || !!status;
+
+  const openFilters = () => {
+    setDraftAuthor(author);
+    setDraftGenre(genre);
+    setDraftStatus(status);
+    setShowFilters(true);
+  };
+
+  const applyFilters = () => {
+    setAuthor(draftAuthor);
+    setGenre(draftGenre);
+    setStatus(draftStatus);
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    setDraftAuthor('');
+    setDraftGenre('');
+    setDraftStatus(undefined);
+    setAuthor('');
+    setGenre('');
+    setStatus(undefined);
+    setShowFilters(false);
+  };
+
+  const effectiveSearch = buildSeriesSearchQuery({ title: search, author, genre, status });
 
   useEffect(() => {
     AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
@@ -66,10 +118,16 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
     enabled: !!api,
   });
 
+  const readListsQuery = useQuery({
+    queryKey: ['readlists'],
+    queryFn: () => getReadLists(api!),
+    enabled: !!api,
+  });
+
   const seriesQuery = useInfiniteQuery({
-    queryKey: ['series', libraryId, search, sort],
+    queryKey: ['series', libraryId, effectiveSearch, sort],
     queryFn: ({ pageParam = 0 }) =>
-      getSeries(api!, { libraryId, search, sort, page: pageParam, size: PAGE_SIZE }),
+      getSeries(api!, { libraryId, search: effectiveSearch, sort, page: pageParam, size: PAGE_SIZE }),
     enabled: !!api,
     initialPageParam: 0,
     getNextPageParam: lastPage => (lastPage.last ? undefined : lastPage.number + 1),
@@ -78,6 +136,7 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const handleRefresh = () => {
     librariesQuery.refetch();
     collectionsQuery.refetch();
+    readListsQuery.refetch();
     seriesQuery.refetch();
   };
 
@@ -93,23 +152,121 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
           Biblioteca
         </Text>
 
-        <TextInput
-          style={[
-            styles.search,
-            typography.body,
-            {
-              backgroundColor: colors.secondaryBackground,
-              borderRadius: radii.md,
-              color: colors.label,
-              marginTop: spacing.md,
-            },
-          ]}
-          placeholder="Buscar series"
-          placeholderTextColor={colors.tertiaryLabel}
-          value={search}
-          onChangeText={setSearch}
-        />
+        <View style={[styles.searchRow, { marginTop: spacing.md }]}>
+          <TextInput
+            style={[
+              styles.search,
+              typography.body,
+              {
+                flex: 1,
+                backgroundColor: colors.secondaryBackground,
+                borderRadius: radii.md,
+                color: colors.label,
+              },
+            ]}
+            placeholder="Buscar series"
+            placeholderTextColor={colors.tertiaryLabel}
+            value={search}
+            onChangeText={setSearch}
+          />
+          <TouchableOpacity
+            onPress={openFilters}
+            style={[
+              styles.filterButton,
+              {
+                borderRadius: radii.md,
+                backgroundColor: hasActiveFilters ? colors.accent : colors.secondaryBackground,
+                marginLeft: spacing.sm,
+              },
+            ]}>
+            <Text style={{ color: hasActiveFilters ? '#FFFFFF' : colors.label, fontSize: 16 }}>⚲</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <Modal
+        visible={showFilters}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFilters(false)}>
+        <TouchableOpacity
+          style={styles.filtersBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowFilters(false)}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.filtersSheet, { backgroundColor: colors.secondaryBackground, borderRadius: radii.lg }]}>
+            <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.md }]}>
+              Filtros avanzados
+            </Text>
+
+            <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs }]}>
+              AUTOR
+            </Text>
+            <TextInput
+              style={[
+                styles.search,
+                typography.body,
+                { backgroundColor: colors.background, borderRadius: radii.md, color: colors.label, marginBottom: spacing.md },
+              ]}
+              placeholder="p. ej. Sean Murphy"
+              placeholderTextColor={colors.tertiaryLabel}
+              value={draftAuthor}
+              onChangeText={setDraftAuthor}
+            />
+
+            <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs }]}>
+              GÉNERO
+            </Text>
+            <TextInput
+              style={[
+                styles.search,
+                typography.body,
+                { backgroundColor: colors.background, borderRadius: radii.md, color: colors.label, marginBottom: spacing.md },
+              ]}
+              placeholder="p. ej. Action"
+              placeholderTextColor={colors.tertiaryLabel}
+              value={draftGenre}
+              onChangeText={setDraftGenre}
+            />
+
+            <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs }]}>
+              ESTADO
+            </Text>
+            <View style={styles.statusWrap}>
+              {STATUS_OPTIONS.map(option => {
+                const active = draftStatus === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    onPress={() => setDraftStatus(option.value)}
+                    style={[
+                      styles.chip,
+                      {
+                        borderRadius: radii.pill,
+                        backgroundColor: active ? colors.accent : colors.background,
+                        marginBottom: spacing.sm,
+                      },
+                    ]}>
+                    <Text style={{ color: active ? '#FFFFFF' : colors.label, fontSize: 13 }}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={[styles.filtersActions, { marginTop: spacing.md }]}>
+              <TouchableOpacity onPress={clearFilters} style={styles.filtersActionButton}>
+                <Text style={[typography.body, { color: colors.danger }]}>Limpiar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={applyFilters}
+                style={[styles.filtersActionButton, styles.filtersApplyButton, { backgroundColor: colors.accent, borderRadius: radii.md }]}>
+                <Text style={[typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>Aplicar</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {librariesQuery.data && librariesQuery.data.length > 0 && (
         <FlatList
@@ -164,6 +321,32 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
               </Text>
               <Text style={[typography.caption, { color: colors.secondaryLabel, marginTop: 2 }]}>
                 {item.seriesIds.length} series
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+
+      {readListsQuery.data && readListsQuery.data.content.length > 0 && (
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0, marginTop: spacing.sm }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+          data={readListsQuery.data.content}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.collectionCard,
+                { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
+              ]}
+              onPress={() => navigation.navigate('ReadList', { readListId: item.id, title: item.name })}>
+              <Text style={[typography.subhead, { color: colors.label, fontWeight: '600' }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[typography.caption, { color: colors.secondaryLabel, marginTop: 2 }]}>
+                {item.bookIds.length} libros
               </Text>
             </TouchableOpacity>
           )}
@@ -256,10 +439,18 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  searchRow: { flexDirection: 'row', alignItems: 'center' },
   search: { paddingHorizontal: 14, paddingVertical: 10 },
+  filterButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sortRow: { flexDirection: 'row', alignItems: 'center' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, marginRight: 8 },
   collectionCard: { width: 140, padding: 12, marginRight: 10 },
   row: { justifyContent: 'space-between' },
   loader: { marginTop: 40 },
+  filtersBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  filtersSheet: { padding: 20 },
+  statusWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  filtersActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  filtersActionButton: { paddingVertical: 10, paddingHorizontal: 16 },
+  filtersApplyButton: { flex: 1, alignItems: 'center', marginLeft: 12 },
 });

@@ -5,6 +5,7 @@ import {
   Collection,
   Library,
   Page,
+  ReadList,
   Series,
   UserInfo,
 } from '../types/komga';
@@ -39,6 +40,55 @@ export async function getCollectionSeries(
   return data;
 }
 
+export async function getReadLists(api: AxiosInstance): Promise<Page<ReadList>> {
+  const { data } = await api.get<Page<ReadList>>('/api/v1/readlists', {
+    params: { size: 100 },
+  });
+  return data;
+}
+
+export async function getReadListBooks(
+  api: AxiosInstance,
+  readListId: string,
+  page = 0,
+  size = 24,
+): Promise<Page<Book>> {
+  const { data } = await api.get<Page<Book>>(
+    `/api/v1/readlists/${readListId}/books`,
+    { params: { page, size } },
+  );
+  return data;
+}
+
+// Komga soporta filtros de campo dentro del propio parámetro `search`
+// (ver https://komga.org/docs/guides/search), p. ej. "batman author:(sean
+// murphy) genre:action status:ongoing". No hace falta ningún parámetro
+// nuevo en la API: basta con construir bien el string de búsqueda.
+export interface SeriesSearchFilters {
+  title?: string;
+  author?: string;
+  genre?: string;
+  status?: 'ongoing' | 'ended' | 'hiatus' | 'abandoned';
+}
+
+export function buildSeriesSearchQuery(filters: SeriesSearchFilters): string {
+  const parts: string[] = [];
+  if (filters.title?.trim()) {
+    parts.push(filters.title.trim());
+  }
+  if (filters.author?.trim()) {
+    parts.push(`author:(${filters.author.trim()})`);
+  }
+  if (filters.genre?.trim()) {
+    const genre = filters.genre.trim();
+    parts.push(genre.includes(' ') ? `genre:"${genre}"` : `genre:${genre}`);
+  }
+  if (filters.status) {
+    parts.push(`status:${filters.status}`);
+  }
+  return parts.join(' ');
+}
+
 export type SeriesSort = 'title' | 'recent';
 
 const SERIES_SORT_PARAMS: Record<SeriesSort, string> = {
@@ -64,6 +114,13 @@ export async function getSeries(
       size: opts.size ?? 24,
       sort: SERIES_SORT_PARAMS[opts.sort ?? 'title'],
     },
+  });
+  return data;
+}
+
+export async function getBooksInProgress(api: AxiosInstance, size = 10): Promise<Page<Book>> {
+  const { data } = await api.get<Page<Book>>('/api/v1/books', {
+    params: { read_status: 'IN_PROGRESS', sort: 'readProgress.readDate,desc', size },
   });
   return data;
 }

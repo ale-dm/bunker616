@@ -78,6 +78,13 @@ export interface Collection {
   seriesIds: string[];
 }
 
+export interface ReadList {
+  id: string;
+  name: string;
+  ordered: boolean;
+  bookIds: string[];
+}
+
 export interface UserInfo {
   id: string;
   email: string;
