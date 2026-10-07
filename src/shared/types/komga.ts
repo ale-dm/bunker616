@@ -66,6 +66,7 @@ export interface Book {
   metadata: {
     title: string;
     number: string;
+    summary?: string;
   };
   readProgress?: ReadProgress;
 }

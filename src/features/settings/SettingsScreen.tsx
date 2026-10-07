@@ -4,6 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SettingsScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { disableAppLock, enableAppLock, isAppLockEnabled, isBiometrySupported } from '@features/auth/appLock';
+import {
+  getDefaultReadingDirection,
+  ReadingDirection,
+  setDefaultReadingDirection,
+} from '@features/reader/readingDirection';
 import { ThemePreference, useTheme } from '@shared/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
@@ -12,17 +17,29 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'dark', label: 'Oscuro' },
 ];
 
+const DIRECTION_OPTIONS: { value: ReadingDirection; label: string }[] = [
+  { value: 'ltr', label: 'Occidental' },
+  { value: 'rtl', label: 'Manga (RTL)' },
+];
+
 export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { servers, activeServer, switchServer, removeServer } = useAuth();
   const { colors, spacing, radii, typography, preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
   const [biometrySupported, setBiometrySupported] = useState(false);
   const [appLockEnabled, setAppLockEnabled] = useState(false);
+  const [readingDirection, setReadingDirection] = useState<ReadingDirection>('ltr');
 
   useEffect(() => {
     isBiometrySupported().then(setBiometrySupported);
     isAppLockEnabled().then(setAppLockEnabled);
+    getDefaultReadingDirection().then(setReadingDirection);
   }, []);
+
+  const onChangeReadingDirection = (direction: ReadingDirection) => {
+    setReadingDirection(direction);
+    setDefaultReadingDirection(direction);
+  };
 
   const onToggleAppLock = async (value: boolean) => {
     if (value) {
@@ -110,6 +127,37 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                   active && { backgroundColor: colors.accent },
                 ]}
                 onPress={() => setPreference(option.value)}>
+                <Text
+                  style={[
+                    typography.subhead,
+                    { color: active ? '#FFFFFF' : colors.label, fontWeight: active ? '600' : '400' },
+                  ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          DIRECCIÓN DE LECTURA
+        </Text>
+        <View
+          style={[
+            styles.segmented,
+            { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
+          ]}>
+          {DIRECTION_OPTIONS.map(option => {
+            const active = readingDirection === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.segmentItem,
+                  { borderRadius: radii.sm },
+                  active && { backgroundColor: colors.accent },
+                ]}
+                onPress={() => onChangeReadingDirection(option.value)}>
                 <Text
                   style={[
                     typography.subhead,

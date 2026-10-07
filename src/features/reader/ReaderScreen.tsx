@@ -1,6 +1,15 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +19,7 @@ import { getAuthHeader } from '@shared/api/client';
 import { getBook, getBookPages, bookPageUrl } from '@shared/api/komga';
 import { ZoomablePage } from './components/ZoomablePage';
 import { useReaderProgress } from './hooks/useReaderProgress';
+import { getDefaultReadingDirection } from './readingDirection';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
 
@@ -23,9 +33,19 @@ export function ReaderScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const [showOverlay, setShowOverlay] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<number | null>(null);
   const [dimIndex, setDimIndex] = useState(0);
   const [incognito, setIncognito] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [rtl, setRtl] = useState(false);
+  const [rtlLoaded, setRtlLoaded] = useState(false);
+
+  useEffect(() => {
+    getDefaultReadingDirection().then(direction => {
+      setRtl(direction === 'rtl');
+      setRtlLoaded(true);
+    });
+  }, []);
 
   const bookQuery = useQuery({
     queryKey: ['book', bookId],
@@ -42,6 +62,12 @@ export function ReaderScreen({ route, navigation }: Props) {
   const pages = pagesQuery.data ?? [];
   const { reportPage } = useReaderProgress(api, bookId, pages.length);
 
+  // En RTL, la posición del PagerView (orden visual/físico) y el número de
+  // página "de lectura" van en orden inverso. Esta función es su propia
+  // inversa: sirve para convertir en ambos sentidos.
+  const toPagerPosition = (readingIndex: number) =>
+    rtl ? pages.length - 1 - readingIndex : readingIndex;
+
   const initialIndex = useMemo(() => {
     const progress = bookQuery.data?.readProgress;
     if (!progress || progress.completed || pages.length === 0) {
@@ -50,7 +76,7 @@ export function ReaderScreen({ route, navigation }: Props) {
     return Math.min(Math.max(progress.page - 1, 0), pages.length - 1);
   }, [bookQuery.data, pages.length]);
 
-  if (!credentials || bookQuery.isLoading || pagesQuery.isLoading) {
+  if (!credentials || !rtlLoaded || bookQuery.isLoading || pagesQuery.isLoading) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator color="#5865f2" size="large" />
@@ -58,15 +84,35 @@ export function ReaderScreen({ route, navigation }: Props) {
     );
   }
 
-  const activeIndex = currentIndex ?? initialIndex;
+  const activeIndex = currentPosition !== null ? toPagerPosition(currentPosition) : initialIndex;
   const authHeader = getAuthHeader(credentials);
   const progressRatio = pages.length > 0 ? (activeIndex + 1) / pages.length : 0;
+  const displayPages = rtl ? [...pages].reverse() : pages;
+
+  const goToReadingIndex = (readingIndex: number) => {
+    if (readingIndex < 0 || readingIndex >= pages.length) {
+      return;
+    }
+    pagerRef.current?.setPage(toPagerPosition(readingIndex));
+  };
+
+  const handleToggleRtl = () => {
+    const newRtl = !rtl;
+    const newPosition = newRtl ? pages.length - 1 - activeIndex : activeIndex;
+    setRtl(newRtl);
+    // displayPages cambia de orden al re-renderizar; hay que decirle al
+    // PagerView en qué posición física queda ahora esa misma página.
+    requestAnimationFrame(() => {
+      pagerRef.current?.setPageWithoutAnimation(newPosition);
+      setCurrentPosition(newPosition);
+    });
+  };
 
   const handleTap = (xRatio: number) => {
-    if (xRatio < 0.3 && activeIndex > 0) {
-      pagerRef.current?.setPage(activeIndex - 1);
-    } else if (xRatio > 0.7 && activeIndex < pages.length - 1) {
-      pagerRef.current?.setPage(activeIndex + 1);
+    if (xRatio < 0.3) {
+      goToReadingIndex(rtl ? activeIndex + 1 : activeIndex - 1);
+    } else if (xRatio > 0.7) {
+      goToReadingIndex(rtl ? activeIndex - 1 : activeIndex + 1);
     } else {
       setShowOverlay(v => !v);
     }
@@ -78,15 +124,15 @@ export function ReaderScreen({ route, navigation }: Props) {
       <PagerView
         ref={pagerRef}
         style={styles.pager}
-        initialPage={initialIndex}
+        initialPage={toPagerPosition(initialIndex)}
         onPageSelected={(e: PagerViewOnPageSelectedEvent) => {
-          const index = e.nativeEvent.position;
-          setCurrentIndex(index);
+          const position = e.nativeEvent.position;
+          setCurrentPosition(position);
           if (!incognito) {
-            reportPage(index);
+            reportPage(toPagerPosition(position));
           }
         }}>
-        {pages.map(page => (
+        {displayPages.map(page => (
           <View key={page.number} collapsable={false}>
             <ZoomablePage
               uri={bookPageUrl(credentials.baseUrl, bookId, page.number)}
@@ -113,6 +159,20 @@ export function ReaderScreen({ route, navigation }: Props) {
             <Text style={styles.overlayTitle} numberOfLines={1}>
               {title}
             </Text>
+            <TouchableOpacity
+              onPress={() => setShowInfo(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.infoButton}>
+              <Text style={styles.infoButtonText}>ⓘ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleToggleRtl}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.incognitoButton}>
+              <Text style={[styles.incognitoText, rtl && styles.incognitoTextActive]}>
+                {rtl ? 'Manga (RTL)' : 'Occidental'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setIncognito(v => !v)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -149,6 +209,29 @@ export function ReaderScreen({ route, navigation }: Props) {
           </View>
         </>
       )}
+
+      <Modal visible={showInfo} transparent animationType="fade" onRequestClose={() => setShowInfo(false)}>
+        <TouchableOpacity
+          style={styles.infoBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowInfo(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.infoSheet}>
+            <Text style={styles.infoTitle}>{bookQuery.data?.metadata.title || title}</Text>
+            {!!bookQuery.data?.metadata.number && (
+              <Text style={styles.infoSubtitle}>Número {bookQuery.data.metadata.number}</Text>
+            )}
+            <ScrollView style={styles.infoScroll}>
+              <Text style={styles.infoSummary}>
+                {bookQuery.data?.metadata.summary || 'Sin resumen disponible para este número.'}
+              </Text>
+            </ScrollView>
+            <Text style={styles.infoPages}>{pages.length} páginas</Text>
+            <TouchableOpacity style={styles.infoCloseButton} onPress={() => setShowInfo(false)}>
+              <Text style={styles.infoCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -179,6 +262,32 @@ const styles = StyleSheet.create({
   incognitoButton: { paddingHorizontal: 8 },
   incognitoText: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
   incognitoTextActive: { color: '#FF9500' },
+  infoButton: { paddingHorizontal: 8 },
+  infoButtonText: { color: '#fff', fontSize: 18 },
+  infoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  infoSheet: {
+    backgroundColor: '#1c1c1e',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    maxHeight: '60%',
+  },
+  infoTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  infoSubtitle: { color: '#9b9ba1', fontSize: 13, marginTop: 4 },
+  infoScroll: { marginTop: 12, marginBottom: 12 },
+  infoSummary: { color: '#d1d1d6', fontSize: 14, lineHeight: 20 },
+  infoPages: { color: '#9b9ba1', fontSize: 12, marginBottom: 12 },
+  infoCloseButton: {
+    backgroundColor: '#5865f2',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  infoCloseText: { color: '#fff', fontWeight: '600' },
   overlayBottom: {
     position: 'absolute',
     bottom: 0,
