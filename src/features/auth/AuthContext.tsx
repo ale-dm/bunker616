@@ -8,9 +8,9 @@ import React, {
 } from 'react';
 import * as Keychain from 'react-native-keychain';
 import { AxiosInstance } from 'axios';
-import { ServerCredentials } from '../types/komga';
-import { createApiClient } from '../api/client';
-import { getCurrentUser } from '../api/komga';
+import { ServerCredentials } from '@shared/types/komga';
+import { createApiClient } from '@shared/api/client';
+import { getCurrentUser } from '@shared/api/komga';
 
 const KEYCHAIN_SERVICE = 'bunker616.komga';
 

@@ -1,23 +1,15 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import {
-  ActivityIndicator,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import PagerView, {
-  PagerViewOnPageSelectedEvent,
-} from 'react-native-pager-view';
+import { useQuery } from '@tanstack/react-query';
+import { ActivityIndicator, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../auth/AuthContext';
-import { getAuthHeader } from '../api/client';
-import { getBook, getBookPages, bookPageUrl, updateReadProgress } from '../api/komga';
-import { ZoomablePage } from '../components/ZoomablePage';
+import { RootStackParamList } from '@navigation/types';
+import { useAuth } from '@features/auth/AuthContext';
+import { getAuthHeader } from '@shared/api/client';
+import { getBook, getBookPages, bookPageUrl } from '@shared/api/komga';
+import { ZoomablePage } from './components/ZoomablePage';
+import { useReaderProgress } from './hooks/useReaderProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
 
@@ -41,19 +33,16 @@ export function ReaderScreen({ route, navigation }: Props) {
     enabled: !!api,
   });
 
-  const progressMutation = useMutation({
-    mutationFn: (payload: { page: number; completed: boolean }) =>
-      updateReadProgress(api!, bookId, payload),
-  });
+  const pages = pagesQuery.data ?? [];
+  const { reportPage } = useReaderProgress(api, bookId, pages.length);
 
   const initialIndex = useMemo(() => {
     const progress = bookQuery.data?.readProgress;
-    const totalPages = pagesQuery.data?.length ?? 0;
-    if (!progress || progress.completed || totalPages === 0) {
+    if (!progress || progress.completed || pages.length === 0) {
       return 0;
     }
-    return Math.min(Math.max(progress.page - 1, 0), totalPages - 1);
-  }, [bookQuery.data, pagesQuery.data]);
+    return Math.min(Math.max(progress.page - 1, 0), pages.length - 1);
+  }, [bookQuery.data, pages.length]);
 
   if (!credentials || bookQuery.isLoading || pagesQuery.isLoading) {
     return (
@@ -63,14 +52,9 @@ export function ReaderScreen({ route, navigation }: Props) {
     );
   }
 
-  const pages = pagesQuery.data ?? [];
   const activeIndex = currentIndex ?? initialIndex;
   const authHeader = getAuthHeader(credentials);
-
-  const reportProgress = (index: number) => {
-    const page = index + 1;
-    progressMutation.mutate({ page, completed: page >= pages.length });
-  };
+  const progressRatio = pages.length > 0 ? (activeIndex + 1) / pages.length : 0;
 
   const handleTap = (xRatio: number) => {
     if (xRatio < 0.3 && activeIndex > 0) {
@@ -92,7 +76,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         onPageSelected={(e: PagerViewOnPageSelectedEvent) => {
           const index = e.nativeEvent.position;
           setCurrentIndex(index);
-          reportProgress(index);
+          reportPage(index);
         }}>
         {pages.map(page => (
           <View key={page.number} collapsable={false}>
@@ -106,17 +90,24 @@ export function ReaderScreen({ route, navigation }: Props) {
       </PagerView>
 
       {showOverlay && (
-        <View style={[styles.overlayTop, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>‹ Volver</Text>
-          </TouchableOpacity>
-          <Text style={styles.overlayTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.pageCounter}>
-            {activeIndex + 1} / {pages.length}
-          </Text>
-        </View>
+        <>
+          <View style={[styles.overlayTop, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.backButton}>‹ Volver</Text>
+            </TouchableOpacity>
+            <Text style={styles.overlayTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={styles.pageCounter}>
+              {activeIndex + 1} / {pages.length}
+            </Text>
+          </View>
+          <View style={[styles.overlayBottom, { paddingBottom: insets.bottom + 8 }]}>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
+            </View>
+          </View>
+        </>
       )}
     </View>
   );
@@ -145,4 +136,20 @@ const styles = StyleSheet.create({
   backButton: { color: '#fff', fontSize: 16, marginRight: 12 },
   overlayTitle: { color: '#fff', fontSize: 14, flex: 1 },
   pageCounter: { color: '#c7c7d1', fontSize: 13, marginLeft: 12 },
+  overlayBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: '#5865f2' },
 });
