@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -21,9 +22,11 @@ import {
   getLibraries,
   getReadLists,
   getSeries,
+  getSeriesById,
   SeriesSearchFilters,
   SeriesSort,
 } from '@shared/api/komga';
+import { getFavoriteIds } from './favorites';
 import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
@@ -57,6 +60,14 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const [sort, setSort] = useState<SeriesSort>('title');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showFilters, setShowFilters] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      getFavoriteIds().then(setFavoriteIds);
+    }, []),
+  );
   const [author, setAuthor] = useState('');
   const [genre, setGenre] = useState('');
   const [status, setStatus] = useState<SeriesSearchFilters['status']>(undefined);
@@ -133,17 +144,32 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
     getNextPageParam: lastPage => (lastPage.last ? undefined : lastPage.number + 1),
   });
 
+  const favoritesQuery = useQuery({
+    queryKey: ['favorites', favoriteIds],
+    queryFn: () => Promise.all(favoriteIds.map(id => getSeriesById(api!, id))),
+    enabled: !!api && favoritesOnly && favoriteIds.length > 0,
+  });
+
   const handleRefresh = () => {
     librariesQuery.refetch();
     collectionsQuery.refetch();
     readListsQuery.refetch();
-    seriesQuery.refetch();
+    if (favoritesOnly) {
+      favoritesQuery.refetch();
+    } else {
+      seriesQuery.refetch();
+    }
   };
 
-  const series: Series[] = useMemo(
-    () => seriesQuery.data?.pages.flatMap(p => p.content) ?? [],
-    [seriesQuery.data],
-  );
+  const series: Series[] = useMemo(() => {
+    if (favoritesOnly) {
+      return favoriteIds.length > 0 ? favoritesQuery.data ?? [] : [];
+    }
+    return seriesQuery.data?.pages.flatMap(p => p.content) ?? [];
+  }, [favoritesOnly, favoriteIds, favoritesQuery.data, seriesQuery.data]);
+
+  const isLoadingSeries = favoritesOnly ? favoritesQuery.isLoading && favoriteIds.length > 0 : seriesQuery.isLoading;
+  const isRefetchingSeries = favoritesOnly ? favoritesQuery.isRefetching : seriesQuery.isRefetching && !seriesQuery.isFetchingNextPage;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -380,14 +406,24 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
             );
           })}
         </View>
-        <TouchableOpacity onPress={toggleViewMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
-            {viewMode === 'grid' ? 'Ver en lista' : 'Ver en grid'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.sortRow}>
+          <TouchableOpacity
+            onPress={() => setFavoritesOnly(v => !v)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginRight: spacing.md }}>
+            <Text style={{ fontSize: 16, color: favoritesOnly ? colors.progress : colors.secondaryLabel }}>
+              {favoritesOnly ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleViewMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
+              {viewMode === 'grid' ? 'Ver en lista' : 'Ver en grid'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {seriesQuery.isLoading ? (
+      {isLoadingSeries ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : (
         <FlatList
@@ -403,15 +439,11 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
               : undefined
           }
           refreshControl={
-            <RefreshControl
-              refreshing={seriesQuery.isRefetching && !seriesQuery.isFetchingNextPage}
-              onRefresh={handleRefresh}
-              tintColor={colors.accent}
-            />
+            <RefreshControl refreshing={isRefetchingSeries} onRefresh={handleRefresh} tintColor={colors.accent} />
           }
           onEndReachedThreshold={0.5}
           onEndReached={() => {
-            if (seriesQuery.hasNextPage && !seriesQuery.isFetchingNextPage) {
+            if (!favoritesOnly && seriesQuery.hasNextPage && !seriesQuery.isFetchingNextPage) {
               seriesQuery.fetchNextPage();
             }
           }}
@@ -427,9 +459,13 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
               <SeriesListItem series={item} onPress={onPress} />
             );
           }}
-          ListEmptyComponent={<EmptyState message="No se encontraron series." />}
+          ListEmptyComponent={
+            <EmptyState
+              message={favoritesOnly ? 'Todavía no tienes series favoritas.' : 'No se encontraron series.'}
+            />
+          }
           ListFooterComponent={
-            seriesQuery.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : undefined
+            !favoritesOnly && seriesQuery.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : undefined
           }
         />
       )}

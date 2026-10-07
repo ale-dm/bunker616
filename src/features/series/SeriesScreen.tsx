@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getSeriesBooks, updateReadProgress } from '@shared/api/komga';
+import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
 import { useTheme } from '@shared/theme';
 import { BookListItem } from './components/BookListItem';
 
@@ -17,6 +18,16 @@ export function SeriesScreen({ route, navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    getFavoriteIds().then(ids => setIsFavorite(ids.includes(seriesId)));
+  }, [seriesId]);
+
+  const onToggleFavorite = async () => {
+    const ids = await toggleFavorite(seriesId);
+    setIsFavorite(ids.includes(seriesId));
+  };
 
   const booksQueryKey = ['series', seriesId, 'books'];
 
@@ -41,14 +52,19 @@ export function SeriesScreen({ route, navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <Text
-        style={[
-          typography.title,
-          { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md },
-        ]}
-        numberOfLines={2}>
-        {title}
-      </Text>
+      <View style={[styles.header, { paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md }]}>
+        <Text style={[typography.title, { color: colors.label, flex: 1 }]} numberOfLines={2}>
+          {title}
+        </Text>
+        <TouchableOpacity
+          onPress={onToggleFavorite}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginLeft: spacing.sm }}>
+          <Text style={{ fontSize: 24, color: isFavorite ? colors.progress : colors.secondaryLabel }}>
+            {isFavorite ? '★' : '☆'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {booksQuery.isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
@@ -96,5 +112,6 @@ export function SeriesScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'flex-start' },
   loader: { marginTop: 40 },
 });

@@ -96,6 +96,11 @@ const SERIES_SORT_PARAMS: Record<SeriesSort, string> = {
   recent: 'createdDate,desc',
 };
 
+export async function getSeriesById(api: AxiosInstance, seriesId: string): Promise<Series> {
+  const { data } = await api.get<Series>(`/api/v1/series/${seriesId}`);
+  return data;
+}
+
 export async function getSeries(
   api: AxiosInstance,
   opts: {

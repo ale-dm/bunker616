@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ActivityIndicator,
+  FlatList,
+  Image,
   Modal,
   ScrollView,
   StatusBar,
@@ -37,6 +39,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [dimIndex, setDimIndex] = useState(0);
   const [incognito, setIncognito] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showPageGrid, setShowPageGrid] = useState(false);
   const [rtl, setRtl] = useState(false);
   const [rtlLoaded, setRtlLoaded] = useState(false);
 
@@ -181,9 +184,11 @@ export function ReaderScreen({ route, navigation }: Props) {
                 {incognito ? 'Incógnito ●' : 'Incógnito'}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.pageCounter}>
-              {activeIndex + 1} / {pages.length}
-            </Text>
+            <TouchableOpacity onPress={() => setShowPageGrid(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.pageCounter}>
+                {activeIndex + 1} / {pages.length}
+              </Text>
+            </TouchableOpacity>
           </View>
           <View style={[styles.overlayBottom, { paddingBottom: insets.bottom + 8 }]}>
             <View style={styles.brightnessRow}>
@@ -231,6 +236,41 @@ export function ReaderScreen({ route, navigation }: Props) {
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showPageGrid}
+        animationType="slide"
+        onRequestClose={() => setShowPageGrid(false)}>
+        <View style={[styles.gridContainer, { paddingTop: insets.top }]}>
+          <View style={styles.gridHeader}>
+            <Text style={styles.gridTitle}>Páginas</Text>
+            <TouchableOpacity onPress={() => setShowPageGrid(false)}>
+              <Text style={styles.gridCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={pages}
+            numColumns={4}
+            keyExtractor={page => String(page.number)}
+            contentContainerStyle={styles.gridList}
+            renderItem={({ item: page, index }) => (
+              <TouchableOpacity
+                style={[styles.gridItem, index === activeIndex && styles.gridItemActive]}
+                onPress={() => {
+                  setShowPageGrid(false);
+                  goToReadingIndex(index);
+                }}>
+                <Image
+                  source={{ uri: bookPageUrl(credentials.baseUrl, bookId, page.number), headers: { Authorization: authHeader } }}
+                  style={styles.gridThumb}
+                  resizeMode="cover"
+                />
+                <Text style={styles.gridPageNumber}>{index + 1}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </Modal>
     </View>
   );
@@ -325,4 +365,24 @@ const styles = StyleSheet.create({
     borderColor: '#5865f2',
     marginRight: 8,
   },
+  gridContainer: { flex: 1, backgroundColor: '#000' },
+  gridHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  gridTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  gridCloseText: { color: '#5865f2', fontSize: 15, fontWeight: '600' },
+  gridList: { paddingHorizontal: 8, paddingBottom: 24 },
+  gridItem: { width: '25%', padding: 6 },
+  gridItemActive: { opacity: 0.6 },
+  gridThumb: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    borderRadius: 6,
+    backgroundColor: '#1c1c1e',
+  },
+  gridPageNumber: { color: '#9b9ba1', fontSize: 11, textAlign: 'center', marginTop: 4 },
 });
