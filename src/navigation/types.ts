@@ -1,5 +1,21 @@
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+export type TabParamList = {
+  LibraryTab: undefined;
+  SettingsTab: undefined;
+};
+
 export type RootStackParamList = {
-  Library: undefined;
+  Tabs: undefined;
   Series: { seriesId: string; title: string };
   Reader: { bookId: string; title: string; seriesId: string };
 };
+
+// LibraryScreen vive dentro del Tab.Navigator pero necesita poder navegar
+// a 'Series', que vive un nivel arriba en el Stack.Navigator raíz.
+export type LibraryScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, 'LibraryTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;

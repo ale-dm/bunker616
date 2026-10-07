@@ -18,9 +18,22 @@ export async function getLibraries(api: AxiosInstance): Promise<Library[]> {
   return data;
 }
 
+export type SeriesSort = 'title' | 'recent';
+
+const SERIES_SORT_PARAMS: Record<SeriesSort, string> = {
+  title: 'metadata.titleSort,asc',
+  recent: 'createdDate,desc',
+};
+
 export async function getSeries(
   api: AxiosInstance,
-  opts: { libraryId?: string; search?: string; page?: number; size?: number },
+  opts: {
+    libraryId?: string;
+    search?: string;
+    page?: number;
+    size?: number;
+    sort?: SeriesSort;
+  },
 ): Promise<Page<Series>> {
   const { data } = await api.get<Page<Series>>('/api/v1/series', {
     params: {
@@ -28,7 +41,7 @@ export async function getSeries(
       search: opts.search || undefined,
       page: opts.page ?? 0,
       size: opts.size ?? 24,
-      sort: 'metadata.titleSort,asc',
+      sort: SERIES_SORT_PARAMS[opts.sort ?? 'title'],
     },
   });
   return data;
