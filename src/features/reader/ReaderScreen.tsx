@@ -225,6 +225,11 @@ export function ReaderScreen({ route, navigation }: Props) {
             {!!bookQuery.data?.metadata.number && (
               <Text style={styles.infoSubtitle}>Número {bookQuery.data.metadata.number}</Text>
             )}
+            {!!bookQuery.data?.metadata.authors?.length && (
+              <Text style={styles.infoAuthors} numberOfLines={2}>
+                {bookQuery.data.metadata.authors.map(a => `${a.name} (${a.role})`).join(' · ')}
+              </Text>
+            )}
             <ScrollView style={styles.infoScroll}>
               <Text style={styles.infoSummary}>
                 {bookQuery.data?.metadata.summary || 'Sin resumen disponible para este número.'}
@@ -318,6 +323,7 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   infoSubtitle: { color: '#9b9ba1', fontSize: 13, marginTop: 4 },
+  infoAuthors: { color: '#9b9ba1', fontSize: 12, marginTop: 6 },
   infoScroll: { marginTop: 12, marginBottom: 12 },
   infoSummary: { color: '#d1d1d6', fontSize: 14, lineHeight: 20 },
   infoPages: { color: '#9b9ba1', fontSize: 12, marginBottom: 12 },

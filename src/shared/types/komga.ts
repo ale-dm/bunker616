@@ -30,6 +30,11 @@ export interface ReadProgress {
   readDate?: string;
 }
 
+export interface Author {
+  name: string;
+  role: string;
+}
+
 export interface Series {
   id: string;
   libraryId: string;
@@ -42,6 +47,10 @@ export interface Series {
     title: string;
     summary?: string;
     status?: string;
+    genres?: string[];
+    publisher?: string;
+    ageRating?: number | null;
+    language?: string;
   };
 }
 
@@ -67,6 +76,7 @@ export interface Book {
     title: string;
     number: string;
     summary?: string;
+    authors?: Author[];
   };
   readProgress?: ReadProgress;
 }
