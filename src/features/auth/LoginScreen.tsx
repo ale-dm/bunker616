@@ -13,8 +13,12 @@ import {
 import { useAuth } from './AuthContext';
 import { useTheme } from '@shared/theme';
 
-export function LoginScreen() {
-  const { login } = useAuth();
+interface Props {
+  onSuccess?: () => void;
+}
+
+export function LoginScreen({ onSuccess }: Props) {
+  const { addServer } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const [baseUrl, setBaseUrl] = useState('');
   const [email, setEmail] = useState('');
@@ -28,7 +32,8 @@ export function LoginScreen() {
     setError(null);
     setLoading(true);
     try {
-      await login({ baseUrl: baseUrl.trim(), email: email.trim(), password });
+      await addServer({ baseUrl: baseUrl.trim(), email: email.trim(), password });
+      onSuccess?.();
     } catch (e: any) {
       const status = e?.response?.status;
       if (status === 401) {

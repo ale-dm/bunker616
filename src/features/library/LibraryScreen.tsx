@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LibraryScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { getLibraries, getSeries, SeriesSort } from '@shared/api/komga';
+import { getCollections, getLibraries, getSeries, SeriesSort } from '@shared/api/komga';
 import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
@@ -60,6 +60,12 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
     enabled: !!api,
   });
 
+  const collectionsQuery = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => getCollections(api!),
+    enabled: !!api,
+  });
+
   const seriesQuery = useInfiniteQuery({
     queryKey: ['series', libraryId, search, sort],
     queryFn: ({ pageParam = 0 }) =>
@@ -71,6 +77,7 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
 
   const handleRefresh = () => {
     librariesQuery.refetch();
+    collectionsQuery.refetch();
     seriesQuery.refetch();
   };
 
@@ -134,6 +141,32 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
               </TouchableOpacity>
             );
           }}
+        />
+      )}
+
+      {collectionsQuery.data && collectionsQuery.data.content.length > 0 && (
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0, marginTop: spacing.md }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+          data={collectionsQuery.data.content}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.collectionCard,
+                { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
+              ]}
+              onPress={() => navigation.navigate('Collection', { collectionId: item.id, title: item.name })}>
+              <Text style={[typography.subhead, { color: colors.label, fontWeight: '600' }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[typography.caption, { color: colors.secondaryLabel, marginTop: 2 }]}>
+                {item.seriesIds.length} series
+              </Text>
+            </TouchableOpacity>
+          )}
         />
       )}
 
@@ -226,6 +259,7 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: 14, paddingVertical: 10 },
   sortRow: { flexDirection: 'row', alignItems: 'center' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, marginRight: 8 },
+  collectionCard: { width: 140, padding: 12, marginRight: 10 },
   row: { justifyContent: 'space-between' },
   loader: { marginTop: 40 },
 });

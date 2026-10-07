@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SettingsScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { disableAppLock, enableAppLock, isAppLockEnabled, isBiometrySupported } from '@features/auth/appLock';
 import { ThemePreference, useTheme } from '@shared/theme';
@@ -11,8 +12,8 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'dark', label: 'Oscuro' },
 ];
 
-export function SettingsScreen() {
-  const { credentials, logout } = useAuth();
+export function SettingsScreen({ navigation }: SettingsScreenProps) {
+  const { servers, activeServer, switchServer, removeServer } = useAuth();
   const { colors, spacing, radii, typography, preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
   const [biometrySupported, setBiometrySupported] = useState(false);
@@ -32,10 +33,10 @@ export function SettingsScreen() {
     setAppLockEnabled(value);
   };
 
-  const confirmLogout = () => {
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres desconectarte de este servidor?', [
+  const confirmRemoveServer = (id: string, baseUrl: string) => {
+    Alert.alert('Quitar servidor', `¿Seguro que quieres quitar ${baseUrl}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cerrar sesión', style: 'destructive', onPress: () => logout() },
+      { text: 'Quitar', style: 'destructive', onPress: () => removeServer(id) },
     ]);
   };
 
@@ -47,16 +48,48 @@ export function SettingsScreen() {
 
       <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xl }}>
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs }]}>
-          SERVIDOR
+          SERVIDORES
         </Text>
-        <View style={[styles.card, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
-          <Text style={[typography.body, { color: colors.label }]} numberOfLines={1}>
-            {credentials?.baseUrl}
-          </Text>
-          <Text style={[typography.footnote, { color: colors.secondaryLabel, marginTop: 2 }]} numberOfLines={1}>
-            {credentials?.email}
-          </Text>
-        </View>
+        {servers.map(server => {
+          const isActive = server.id === activeServer?.id;
+          return (
+            <TouchableOpacity
+              key={server.id}
+              style={[
+                styles.card,
+                styles.row,
+                {
+                  backgroundColor: colors.secondaryBackground,
+                  borderRadius: radii.md,
+                  marginBottom: spacing.xs,
+                  borderWidth: isActive ? 1.5 : 0,
+                  borderColor: colors.accent,
+                },
+              ]}
+              onPress={() => !isActive && switchServer(server.id)}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.body, { color: colors.label }]} numberOfLines={1}>
+                  {server.baseUrl}
+                </Text>
+                <Text style={[typography.footnote, { color: colors.secondaryLabel, marginTop: 2 }]} numberOfLines={1}>
+                  {server.email}
+                  {isActive ? ' · Activo' : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => confirmRemoveServer(server.id, server.baseUrl)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[typography.footnote, { color: colors.danger }]}>Quitar</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          );
+        })}
+
+        <TouchableOpacity
+          style={[styles.card, styles.addCard, { borderColor: colors.separator, borderRadius: radii.md }]}
+          onPress={() => navigation.navigate('AddServer')}>
+          <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>+ Añadir servidor</Text>
+        </TouchableOpacity>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
           TEMA
@@ -105,12 +138,6 @@ export function SettingsScreen() {
             </View>
           </>
         )}
-
-        <TouchableOpacity
-          style={[styles.card, styles.logoutCard, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginTop: spacing.lg }]}
-          onPress={confirmLogout}>
-          <Text style={[typography.body, { color: colors.danger }]}>Cerrar sesión</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -120,7 +147,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   card: { padding: 14 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logoutCard: { alignItems: 'center' },
+  addCard: { alignItems: 'center', borderWidth: 1, borderStyle: 'dashed' },
   segmented: { flexDirection: 'row', padding: 4 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8 },
 });

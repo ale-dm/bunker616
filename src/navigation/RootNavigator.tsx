@@ -8,6 +8,7 @@ import { LoginScreen } from '@features/auth/LoginScreen';
 import { LibraryScreen } from '@features/library/LibraryScreen';
 import { SeriesScreen } from '@features/series/SeriesScreen';
 import { ReaderScreen } from '@features/reader/ReaderScreen';
+import { CollectionScreen } from '@features/collections/CollectionScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { useTheme } from '@shared/theme';
 import { RootStackParamList, TabParamList } from './types';
@@ -83,7 +84,11 @@ export function RootNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Tabs" component={Tabs} />
           <Stack.Screen name="Series" component={SeriesScreen} />
+          <Stack.Screen name="Collection" component={CollectionScreen} />
           <Stack.Screen name="Reader" component={ReaderScreen} />
+          <Stack.Screen name="AddServer" options={{ presentation: 'modal' }}>
+            {({ navigation }) => <LoginScreen onSuccess={() => navigation.goBack()} />}
+          </Stack.Screen>
         </Stack.Navigator>
       )}
     </NavigationContainer>

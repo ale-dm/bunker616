@@ -11,11 +11,20 @@ export type RootStackParamList = {
   Tabs: undefined;
   Series: { seriesId: string; title: string };
   Reader: { bookId: string; title: string; seriesId: string };
+  Collection: { collectionId: string; title: string };
+  AddServer: undefined;
 };
 
 // LibraryScreen vive dentro del Tab.Navigator pero necesita poder navegar
 // a 'Series', que vive un nivel arriba en el Stack.Navigator raíz.
 export type LibraryScreenProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'LibraryTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+// Igual que LibraryScreenProps: SettingsScreen necesita navegar a
+// 'AddServer', que vive en el Stack raíz.
+export type SettingsScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, 'SettingsTab'>,
   NativeStackScreenProps<RootStackParamList>
 >;

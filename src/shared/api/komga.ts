@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import {
   Book,
   BookPage,
+  Collection,
   Library,
   Page,
   Series,
@@ -15,6 +16,26 @@ export async function getCurrentUser(api: AxiosInstance): Promise<UserInfo> {
 
 export async function getLibraries(api: AxiosInstance): Promise<Library[]> {
   const { data } = await api.get<Library[]>('/api/v1/libraries');
+  return data;
+}
+
+export async function getCollections(api: AxiosInstance): Promise<Page<Collection>> {
+  const { data } = await api.get<Page<Collection>>('/api/v1/collections', {
+    params: { size: 100 },
+  });
+  return data;
+}
+
+export async function getCollectionSeries(
+  api: AxiosInstance,
+  collectionId: string,
+  page = 0,
+  size = 24,
+): Promise<Page<Series>> {
+  const { data } = await api.get<Page<Series>>(
+    `/api/v1/collections/${collectionId}/series`,
+    { params: { page, size } },
+  );
   return data;
 }
 

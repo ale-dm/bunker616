@@ -4,6 +4,10 @@ export interface ServerCredentials {
   password: string;
 }
 
+export interface ServerProfile extends ServerCredentials {
+  id: string;
+}
+
 export interface Page<T> {
   content: T[];
   totalPages: number;
@@ -64,6 +68,13 @@ export interface Book {
     number: string;
   };
   readProgress?: ReadProgress;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  ordered: boolean;
+  seriesIds: string[];
 }
 
 export interface UserInfo {
