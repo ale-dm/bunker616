@@ -34,6 +34,7 @@ import { savePageToGallery } from '@features/offline/gallery';
 import { PagedReader, PagedReaderRef } from './components/PagedReader';
 import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
+import { flushPendingProgress } from '@features/sync/progressQueue';
 import {
   nextReaderBackground,
   READER_BACKGROUND_COLORS,
@@ -54,6 +55,8 @@ import { cachedPagePath, prefetchPages } from './pagePrefetch';
 import {
   FitMode,
   getNightDimmingEnabled,
+  getSplitSpreads,
+  setSplitSpreads,
   isNightHour,
   setFitMode,
 } from './readerPrefs';
@@ -97,6 +100,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [background, setBackground] = useState<ReaderBackground>('black');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [fitMode, setFitModeState] = useState<FitMode>('contain');
+  const [splitSpreads, setSplitSpreadsState] = useState(true);
   const [, setPrefetchTick] = useState(0);
   const sessionStartRef = useRef(Date.now());
   const sessionTurnsRef = useRef(0);
@@ -147,6 +151,7 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     getBookmarks(bookId).then(setBookmarks);
+    getSplitSpreads().then(setSplitSpreadsState);
     getNightDimmingEnabled().then(enabled => {
       if (enabled && isNightHour()) {
         setDimIndex(2);
@@ -176,6 +181,12 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const pages: BookPage[] = pagesQuery.data ?? record?.pages ?? [];
   const { reportPage } = useReaderProgress(api, bookId, pages.length);
+
+  useEffect(() => {
+    if (api) {
+      flushPendingProgress(api);
+    }
+  }, [api]);
 
   const initialIndex = useMemo(() => {
     const progressInfo = bookQuery.data?.readProgress;
@@ -313,6 +324,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       baseUrl: credentials.baseUrl,
       authHeader,
       bookId,
+      seriesId,
       title: bookTitle,
       pages: pagesQuery.data,
     }).catch(error =>
@@ -338,6 +350,7 @@ export function ReaderScreen({ route, navigation }: Props) {
           getPageSource={getPageSource}
           rtl={rtl}
           doublePage={doublePage}
+          splitSpreads={splitSpreads}
           backgroundColor={backgroundColor}
           fitMode={fitMode}
           initialPageIndex={initialIndex}
@@ -421,6 +434,14 @@ export function ReaderScreen({ route, navigation }: Props) {
                 <>
                   <ReaderChip label={rtl ? 'Manga (RTL)' : 'Occidental'} active={rtl} onPress={() => setRtl(v => !v)} />
                   <ReaderChip label={doublePage ? '2 páginas' : '1 página'} active={doublePage} onPress={() => setDoublePage(v => !v)} />
+                  <ReaderChip
+                    label="Dividir dobles"
+                    active={splitSpreads}
+                    onPress={() => {
+                      setSplitSpreadsState(v => !v);
+                      setSplitSpreads(!splitSpreads);
+                    }}
+                  />
                   <ReaderChip label={fitMode === 'cover' ? 'Llenar' : 'Completa'} active={fitMode === 'cover'} onPress={onToggleFitMode} />
                 </>
               )}

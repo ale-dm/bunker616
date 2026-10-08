@@ -12,6 +12,7 @@ const PAGE_ATTEMPTS = 3;
 
 export interface OfflineBookRecord {
   bookId: string;
+  seriesId?: string;
   title: string;
   pages: BookPage[];
   bytes: number;
@@ -122,6 +123,7 @@ interface DownloadParams {
   baseUrl: string;
   authHeader: string;
   bookId: string;
+  seriesId: string;
   title: string;
   pages: BookPage[];
 }
@@ -132,7 +134,7 @@ export function downloadBook(params: DownloadParams): Promise<void> {
   return task;
 }
 
-async function runDownload({ baseUrl, authHeader, bookId, title, pages }: DownloadParams) {
+async function runDownload({ baseUrl, authHeader, bookId, seriesId, title, pages }: DownloadParams) {
   const dir = bookDir(bookId);
   await RNBlobUtil.fs.mkdir(dir).catch(() => undefined);
   progressByBook.set(bookId, { done: 0, total: pages.length });
@@ -151,7 +153,7 @@ async function runDownload({ baseUrl, authHeader, bookId, title, pages }: Downlo
       bytes += stat.size;
     }
 
-    await saveRecord({ bookId, title, pages, bytes, downloadedAt: Date.now() });
+    await saveRecord({ bookId, seriesId, title, pages, bytes, downloadedAt: Date.now() });
   } catch (error) {
     await RNBlobUtil.fs.unlink(dir).catch(() => undefined);
     throw error;

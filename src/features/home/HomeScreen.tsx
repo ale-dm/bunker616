@@ -19,6 +19,10 @@ import { Chip, CoverImage, EmptyState, MediaRail, SectionHeader } from '@shared/
 import { useTheme } from '@shared/theme';
 import { getFavoriteIds } from '@features/library/favorites';
 import { getSeriesLastSeen } from '@features/library/seriesSeen';
+import { flushPendingProgress } from '@features/sync/progressQueue';
+import { useOfflineMode } from '@features/offline/offlineMode';
+import { useOfflineRecords } from '@features/offline/useOfflineBook';
+import { localPageUri } from '@features/offline/offlineStore';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
 import { useGridColumns } from '@shared/utils/useGridColumns';
 
@@ -36,7 +40,7 @@ const GENRE_SHORTCUTS = [
   'Misterio',
 ];
 
-export function HomeScreen({ navigation }: HomeScreenProps) {
+function OnlineHome({ navigation }: HomeScreenProps) {
   const { api, credentials } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
@@ -111,7 +115,10 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   useFocusEffect(
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['home', 'following'] });
-    }, [queryClient]),
+      if (api) {
+        flushPendingProgress(api);
+      }
+    }, [queryClient, api]),
   );
 
   const inProgressItems = inProgressQuery.isError ? [] : inProgressQuery.data?.content ?? [];
@@ -286,3 +293,44 @@ const styles = StyleSheet.create({
   heroTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
   heroFill: { height: '100%' },
 });
+
+export function HomeScreen(props: HomeScreenProps) {
+  const offline = useOfflineMode();
+  return offline ? <OfflineHome {...props} /> : <OnlineHome {...props} />;
+}
+
+function OfflineHome({ navigation }: HomeScreenProps) {
+  const { colors, spacing, typography } = useTheme();
+  const insets = useSafeAreaInsets();
+  const records = useOfflineRecords();
+
+  const items = records.map(record => ({
+    id: record.bookId,
+    title: record.title,
+    coverUri: record.pages[0] ? localPageUri(record.bookId, record.pages[0]) : '',
+    onPress: () =>
+      navigation.navigate('Reader', {
+        bookId: record.bookId,
+        title: record.title,
+        seriesId: record.seriesId ?? '',
+      }),
+  }));
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.headerRow, { paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg }]}>
+        <Text style={[typography.largeTitle, styles.headerTitle, { color: colors.label }]}>Inicio</Text>
+      </View>
+      <Text style={[typography.footnote, { color: colors.secondaryLabel, paddingHorizontal: spacing.lg }]}>
+        Modo sin conexión: solo se muestran los números descargados.
+      </Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
+        {items.length > 0 ? (
+          <MediaRail title="Descargados" items={items} />
+        ) : (
+          <EmptyState message="No tienes números descargados. Desactiva el modo sin conexión en Ajustes para explorar." />
+        )}
+      </ScrollView>
+    </View>
+  );
+}

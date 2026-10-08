@@ -124,3 +124,35 @@ describe('nextBooks', () => {
     expect(nextBooks(books).map((b: { id: string }) => b.id)).toEqual(['4', '5']);
   });
 });
+
+describe('buildReadingGroups', () => {
+  const { buildReadingGroups, findSlotGroupIndex } = require('../src/features/reader/pageGroups');
+  const portrait = { width: 800, height: 1200 };
+  const spread = { width: 1600, height: 1200 };
+
+  it('splits landscape pages into two halves in reading order', () => {
+    const groups = buildReadingGroups([portrait, spread, portrait], false, true, false);
+    expect(groups).toEqual([
+      [{ pageIndex: 0 }],
+      [{ pageIndex: 1, half: 'first' }],
+      [{ pageIndex: 1, half: 'second' }],
+      [{ pageIndex: 2 }],
+    ]);
+  });
+
+  it('reverses the halves for right-to-left reading', () => {
+    const groups = buildReadingGroups([spread], false, true, true);
+    expect(groups).toEqual([[{ pageIndex: 0, half: 'second' }], [{ pageIndex: 0, half: 'first' }]]);
+  });
+
+  it('keeps spreads whole when splitting is off or in double-page mode', () => {
+    expect(buildReadingGroups([spread], false, false, false)).toEqual([[{ pageIndex: 0 }]]);
+    expect(buildReadingGroups([portrait, spread], true, true, false)).toEqual([[{ pageIndex: 0 }], [{ pageIndex: 1 }]]);
+  });
+
+  it('finds the group of a page even when it is split', () => {
+    const groups = buildReadingGroups([portrait, spread, portrait], false, true, false);
+    expect(findSlotGroupIndex(groups, 1)).toBe(1);
+    expect(findSlotGroupIndex(groups, 2)).toBe(3);
+  });
+});

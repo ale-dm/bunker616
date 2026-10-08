@@ -13,6 +13,7 @@ import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
 import { getReadStats, ReadStats } from '@features/history/readingLog';
 import { getNightDimmingEnabled, setNightDimmingEnabled } from '@features/reader/readerPrefs';
 import { exportBackup } from './backup';
+import { getOfflineMode, setOfflineMode } from '@features/offline/offlineMode';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { ThemePreference, useTheme } from '@shared/theme';
 
@@ -57,10 +58,17 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const [readStats, setReadStats] = useState<ReadStats | null>(null);
   const [nightDimming, setNightDimming] = useState(false);
+  const [offlineMode, setOfflineModeState] = useState(false);
   useEffect(() => {
     getReadStats().then(setReadStats);
     getNightDimmingEnabled().then(setNightDimming);
+    getOfflineMode().then(setOfflineModeState);
   }, []);
+
+  const onToggleOfflineMode = (value: boolean) => {
+    setOfflineModeState(value);
+    setOfflineMode(value);
+  };
 
   const onToggleNightDimming = (value: boolean) => {
     setNightDimming(value);
@@ -226,6 +234,16 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
               </Text>
             </>
           ) : null}
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          MODO SIN CONEXIÓN
+        </Text>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1, marginRight: spacing.sm }]}>
+            Inicio solo con los números descargados
+          </Text>
+          <Switch value={offlineMode} onValueChange={onToggleOfflineMode} />
         </View>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>

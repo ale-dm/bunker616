@@ -4,6 +4,7 @@ export type FitMode = 'contain' | 'cover';
 
 const FIT_KEY = 'bunker616.readerFit';
 const NIGHT_KEY = 'bunker616.nightDimming';
+const SPLIT_KEY = 'bunker616.splitSpreads';
 
 // Ventana fija para el modo nocturno automático: de 22:00 a 07:00.
 const NIGHT_START_HOUR = 22;
@@ -28,4 +29,12 @@ export async function setNightDimmingEnabled(enabled: boolean): Promise<void> {
 export function isNightHour(date: Date = new Date()): boolean {
   const hour = date.getHours();
   return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR;
+}
+
+export async function getSplitSpreads(): Promise<boolean> {
+  return (await AsyncStorage.getItem(SPLIT_KEY)) !== 'false';
+}
+
+export async function setSplitSpreads(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(SPLIT_KEY, enabled ? 'true' : 'false');
 }

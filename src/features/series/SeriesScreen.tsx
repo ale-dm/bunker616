@@ -165,6 +165,7 @@ export function SeriesScreen({ route, navigation }: Props) {
           baseUrl: credentials.baseUrl,
           authHeader,
           bookId: book.id,
+          seriesId,
           title: book.metadata.title || book.name,
           pages,
         });
