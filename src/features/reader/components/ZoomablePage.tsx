@@ -7,14 +7,14 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { PageSource } from '../types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
 
 interface Props {
-  uri: string;
-  authHeader: string;
+  source: PageSource;
   onTap: (xRatio: number) => void;
   // Para el modo doble página: cada mitad ocupa menos que la pantalla
   // completa, pero el ratio que se le pasa a onTap sigue siendo relativo a
@@ -35,8 +35,7 @@ function clampTranslation(
 }
 
 export function ZoomablePage({
-  uri,
-  authHeader,
+  source,
   onTap,
   width = SCREEN_W,
   height = SCREEN_H,
@@ -117,7 +116,7 @@ export function ZoomablePage({
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.container, { width, height }]}>
         <Animated.Image
-          source={{ uri, headers: { Authorization: authHeader } }}
+          source={source}
           style={[styles.image, { width, height }, animatedStyle]}
           resizeMode="contain"
         />

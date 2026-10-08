@@ -1,8 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { Dimensions, FlatList, Image, TouchableOpacity } from 'react-native';
 import type { ListViewToken as ViewToken } from '@react-native/virtualized-lists';
-import { bookPageUrl } from '@shared/api/komga';
 import { BookPage } from '@shared/types/komga';
+import { PageSource } from '../types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const FALLBACK_ASPECT = 1.4; // alto/ancho típico de una página de cómic
@@ -13,16 +13,14 @@ export interface WebtoonReaderRef {
 
 interface Props {
   pages: BookPage[];
-  baseUrl: string;
-  bookId: string;
-  authHeader: string;
+  getPageSource: (page: BookPage) => PageSource;
   initialPageIndex: number;
   onPageIndexChange: (pageIndex: number) => void;
   onTapCenter: () => void;
 }
 
 export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function WebtoonReaderImpl(
-  { pages, baseUrl, bookId, authHeader, initialPageIndex, onPageIndexChange, onTapCenter },
+  { pages, getPageSource, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
   const listRef = useRef<FlatList<BookPage>>(null);
@@ -64,10 +62,7 @@ export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function Webtoo
         return (
           <TouchableOpacity activeOpacity={1} onPress={onTapCenter}>
             <Image
-              source={{
-                uri: bookPageUrl(baseUrl, bookId, item.number),
-                headers: { Authorization: authHeader },
-              }}
+              source={getPageSource(item)}
               style={{ width: SCREEN_W, height: SCREEN_W * aspect, backgroundColor: '#000' }}
               resizeMode="contain"
             />

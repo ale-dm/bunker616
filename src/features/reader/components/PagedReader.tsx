@@ -7,9 +7,9 @@ import React, {
 } from 'react';
 import { Dimensions, View } from 'react-native';
 import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
-import { bookPageUrl } from '@shared/api/komga';
 import { BookPage } from '@shared/types/komga';
 import { buildPageGroups, findGroupIndex } from '../pageGroups';
+import { PageSource } from '../types';
 import { ZoomablePage } from './ZoomablePage';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -20,9 +20,7 @@ export interface PagedReaderRef {
 
 interface Props {
   pages: BookPage[];
-  baseUrl: string;
-  bookId: string;
-  authHeader: string;
+  getPageSource: (page: BookPage) => PageSource;
   rtl: boolean;
   doublePage: boolean;
   initialPageIndex: number;
@@ -31,7 +29,7 @@ interface Props {
 }
 
 export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReaderImpl(
-  { pages, baseUrl, bookId, authHeader, rtl, doublePage, initialPageIndex, onPageIndexChange, onTapCenter },
+  { pages, getPageSource, rtl, doublePage, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
   const pagerRef = useRef<PagerView>(null);
@@ -112,11 +110,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
           const page = pages[group[0]];
           return (
             <View key={key} collapsable={false}>
-              <ZoomablePage
-                uri={bookPageUrl(baseUrl, bookId, page.number)}
-                authHeader={authHeader}
-                onTap={handleTap}
-              />
+              <ZoomablePage source={getPageSource(page)} onTap={handleTap} />
             </View>
           );
         }
@@ -129,8 +123,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
               return (
                 <ZoomablePage
                   key={page.number}
-                  uri={bookPageUrl(baseUrl, bookId, page.number)}
-                  authHeader={authHeader}
+                  source={getPageSource(page)}
                   onTap={handleTap}
                   width={half}
                   xOffset={slot * half}

@@ -9,6 +9,8 @@ import {
   ReadingDirection,
   setDefaultReadingDirection,
 } from '@features/reader/readingDirection';
+import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
+import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { ThemePreference, useTheme } from '@shared/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
@@ -48,6 +50,16 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
       await disableAppLock();
     }
     setAppLockEnabled(value);
+  };
+
+  const offlineRecords = useOfflineRecords();
+  const offlineBytes = offlineRecords.reduce((sum, record) => sum + record.bytes, 0);
+
+  const confirmDeleteDownload = (bookId: string, title: string) => {
+    Alert.alert('Borrar descarga', `¿Quitar "${title}" del almacenamiento del móvil?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Borrar', style: 'destructive', onPress: () => deleteOfflineBook(bookId) },
+    ]);
   };
 
   const confirmRemoveServer = (id: string, baseUrl: string) => {
@@ -170,6 +182,33 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           })}
         </View>
 
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          DESCARGAS · {formatBytes(offlineBytes)}
+        </Text>
+        <View style={[styles.card, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          {offlineRecords.length === 0 ? (
+            <Text style={[typography.footnote, { color: colors.secondaryLabel }]}>
+              No hay capítulos descargados. Puedes descargarlos desde el lector.
+            </Text>
+          ) : (
+            offlineRecords.map(record => (
+              <View key={record.bookId} style={[styles.row, { paddingVertical: spacing.xs }]}>
+                <View style={styles.offlineInfo}>
+                  <Text style={[typography.body, { color: colors.label }]} numberOfLines={1}>
+                    {record.title}
+                  </Text>
+                  <Text style={[typography.footnote, { color: colors.secondaryLabel }]}>
+                    {formatBytes(record.bytes)} · {record.pages.length} páginas
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => confirmDeleteDownload(record.bookId, record.title)}>
+                  <Text style={[typography.footnote, { color: colors.danger }]}>Borrar</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+
         {biometrySupported && (
           <>
             <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
@@ -198,4 +237,5 @@ const styles = StyleSheet.create({
   addCard: { alignItems: 'center', borderWidth: 1, borderStyle: 'dashed' },
   segmented: { flexDirection: 'row', padding: 4 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  offlineInfo: { flex: 1, marginRight: 12 },
 });

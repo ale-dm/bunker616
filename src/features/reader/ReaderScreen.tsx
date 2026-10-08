@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -18,10 +19,22 @@ import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getAuthHeader } from '@shared/api/client';
 import { getBook, getBookPages, bookPageUrl } from '@shared/api/komga';
+import { BookPage } from '@shared/types/komga';
+import {
+  deleteOfflineBook,
+  downloadBook,
+  extensionFor,
+  formatBytes,
+  localPagePath,
+  localPageUri,
+} from '@features/offline/offlineStore';
+import { useOfflineBook } from '@features/offline/useOfflineBook';
+import { savePageToGallery } from '@features/offline/gallery';
 import { PagedReader, PagedReaderRef } from './components/PagedReader';
 import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
 import { getDefaultReadingDirection } from './readingDirection';
+import { PageSource } from './types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
 type ReaderMode = 'paged' | 'webtoon';
@@ -46,6 +59,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [rtlLoaded, setRtlLoaded] = useState(false);
   const [doublePage, setDoublePage] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
+  const [saving, setSaving] = useState(false);
+  const { record, progress } = useOfflineBook(bookId);
 
   useEffect(() => {
     getDefaultReadingDirection().then(direction => {
@@ -66,18 +81,20 @@ export function ReaderScreen({ route, navigation }: Props) {
     enabled: !!api,
   });
 
-  const pages = pagesQuery.data ?? [];
+  const pages: BookPage[] = pagesQuery.data ?? record?.pages ?? [];
   const { reportPage } = useReaderProgress(api, bookId, pages.length);
 
   const initialIndex = useMemo(() => {
-    const progress = bookQuery.data?.readProgress;
-    if (!progress || progress.completed || pages.length === 0) {
+    const progressInfo = bookQuery.data?.readProgress;
+    if (!progressInfo || progressInfo.completed || pages.length === 0) {
       return 0;
     }
-    return Math.min(Math.max(progress.page - 1, 0), pages.length - 1);
+    return Math.min(Math.max(progressInfo.page - 1, 0), pages.length - 1);
   }, [bookQuery.data, pages.length]);
 
-  if (!credentials || !rtlLoaded || bookQuery.isLoading || pagesQuery.isLoading) {
+  // Un capítulo descargado se abre aunque no haya conexión con el servidor.
+  const waitingForServer = !record && (bookQuery.isLoading || pagesQuery.isLoading);
+  if (!credentials || !rtlLoaded || waitingForServer) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator color="#5865f2" size="large" />
@@ -88,6 +105,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const activeIndex = activePageIndex ?? initialIndex;
   const authHeader = getAuthHeader(credentials);
   const progressRatio = pages.length > 0 ? (activeIndex + 1) / pages.length : 0;
+  const bookTitle = bookQuery.data?.metadata.title || title;
 
   const handlePageIndexChange = (pageIndex: number) => {
     setActivePageIndex(pageIndex);
@@ -104,6 +122,58 @@ export function ReaderScreen({ route, navigation }: Props) {
     }
   };
 
+  const getPageSource = (page: BookPage): PageSource =>
+    record
+      ? { uri: localPageUri(bookId, page) }
+      : {
+          uri: bookPageUrl(credentials.baseUrl, bookId, page.number),
+          headers: { Authorization: authHeader },
+        };
+
+  const savePage = async () => {
+    const page = pages[activeIndex];
+    if (!page || saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await savePageToGallery({
+        fileName: `${bookTitle} - p${String(page.number).padStart(3, '0')}.${extensionFor(page.mediaType)}`,
+        mediaType: page.mediaType,
+        localPath: record ? localPagePath(bookId, page) : undefined,
+        remoteUrl: record ? undefined : bookPageUrl(credentials.baseUrl, bookId, page.number),
+        authHeader,
+      });
+      Alert.alert('Página guardada', 'Se ha guardado en la galería, en la carpeta Bunker616.');
+    } catch (error) {
+      Alert.alert('No se pudo guardar', error instanceof Error ? error.message : 'Error desconocido');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startDownload = () => {
+    if (!pagesQuery.data) {
+      return;
+    }
+    downloadBook({
+      baseUrl: credentials.baseUrl,
+      authHeader,
+      bookId,
+      title: bookTitle,
+      pages: pagesQuery.data,
+    }).catch(error =>
+      Alert.alert(
+        'Descarga fallida',
+        error instanceof Error ? error.message : 'Revisa la conexión e inténtalo de nuevo.',
+      ),
+    );
+  };
+
+  const removeDownload = () => {
+    deleteOfflineBook(bookId);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar hidden={!showOverlay} />
@@ -112,9 +182,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         <PagedReader
           ref={pagedRef}
           pages={pages}
-          baseUrl={credentials.baseUrl}
-          bookId={bookId}
-          authHeader={authHeader}
+          getPageSource={getPageSource}
           rtl={rtl}
           doublePage={doublePage}
           initialPageIndex={initialIndex}
@@ -125,9 +193,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         <WebtoonReader
           ref={webtoonRef}
           pages={pages}
-          baseUrl={credentials.baseUrl}
-          bookId={bookId}
-          authHeader={authHeader}
+          getPageSource={getPageSource}
           initialPageIndex={initialIndex}
           onPageIndexChange={handlePageIndexChange}
           onTapCenter={() => setShowOverlay(v => !v)}
@@ -194,6 +260,9 @@ export function ReaderScreen({ route, navigation }: Props) {
                   </TouchableOpacity>
                 </>
               )}
+              <TouchableOpacity onPress={savePage} disabled={saving} style={styles.chipButton}>
+                <Text style={styles.chipText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.brightnessRow}>
               <Text style={styles.brightnessLabel}>Brillo</Text>
@@ -225,7 +294,7 @@ export function ReaderScreen({ route, navigation }: Props) {
           activeOpacity={1}
           onPress={() => setShowInfo(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.infoSheet}>
-            <Text style={styles.infoTitle}>{bookQuery.data?.metadata.title || title}</Text>
+            <Text style={styles.infoTitle}>{bookTitle}</Text>
             {!!bookQuery.data?.metadata.number && (
               <Text style={styles.infoSubtitle}>Número {bookQuery.data.metadata.number}</Text>
             )}
@@ -240,6 +309,23 @@ export function ReaderScreen({ route, navigation }: Props) {
               </Text>
             </ScrollView>
             <Text style={styles.infoPages}>{pages.length} páginas</Text>
+
+            {progress ? (
+              <Text style={styles.offlineText}>
+                Descargando {progress.done} / {progress.total}…
+              </Text>
+            ) : record ? (
+              <TouchableOpacity onPress={removeDownload} style={styles.offlineButton}>
+                <Text style={styles.offlineButtonText}>
+                  Eliminar descarga · {formatBytes(record.bytes)}
+                </Text>
+              </TouchableOpacity>
+            ) : pagesQuery.data ? (
+              <TouchableOpacity onPress={startDownload} style={styles.offlineButton}>
+                <Text style={styles.offlineButtonText}>Descargar para leer sin conexión</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity style={styles.infoCloseButton} onPress={() => setShowInfo(false)}>
               <Text style={styles.infoCloseText}>Cerrar</Text>
             </TouchableOpacity>
@@ -270,11 +356,7 @@ export function ReaderScreen({ route, navigation }: Props) {
                   setShowPageGrid(false);
                   goToPage(index);
                 }}>
-                <Image
-                  source={{ uri: bookPageUrl(credentials.baseUrl, bookId, page.number), headers: { Authorization: authHeader } }}
-                  style={styles.gridThumb}
-                  resizeMode="cover"
-                />
+                <Image source={getPageSource(page)} style={styles.gridThumb} resizeMode="cover" />
                 <Text style={styles.gridPageNumber}>{index + 1}</Text>
               </TouchableOpacity>
             )}
@@ -330,6 +412,16 @@ const styles = StyleSheet.create({
   infoScroll: { marginTop: 12, marginBottom: 12 },
   infoSummary: { color: '#d1d1d6', fontSize: 14, lineHeight: 20 },
   infoPages: { color: '#9b9ba1', fontSize: 12, marginBottom: 12 },
+  offlineText: { color: '#9b9ba1', fontSize: 13, marginBottom: 12 },
+  offlineButton: {
+    borderWidth: 1,
+    borderColor: '#5865f2',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  offlineButtonText: { color: '#5865f2', fontWeight: '600' },
   infoCloseButton: {
     backgroundColor: '#5865f2',
     borderRadius: 10,
