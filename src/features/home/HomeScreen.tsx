@@ -116,6 +116,9 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
   const inProgressItems = inProgressQuery.isError ? [] : inProgressQuery.data?.content ?? [];
   const heroItem = inProgressItems[0];
+  const heroTotal = heroItem?.media.pagesCount ?? 0;
+  const heroPage = heroItem?.readProgress?.page ?? 0;
+  const heroRatio = heroTotal > 0 ? Math.min(1, heroPage / heroTotal) : 0;
   const hasRecent = (recentQuery.data?.content.length ?? 0) > 0;
   const baseUrl = credentials?.baseUrl ?? '';
 
@@ -192,6 +195,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 </Text>
                 <Text style={[typography.headline, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
                   {heroItem.metadata.title || heroItem.name}
+                </Text>
+                <View style={[styles.heroTrack, { backgroundColor: colors.tertiaryBackground, marginTop: spacing.sm }]}>
+                  <View style={[styles.heroFill, { width: `${heroRatio * 100}%`, backgroundColor: colors.progress }]} />
+                </View>
+                <Text style={[typography.caption, { color: colors.secondaryLabel, marginTop: spacing.xs }]}>
+                  Página {heroPage} de {heroTotal}
                 </Text>
                 <View
                   style={[
@@ -271,4 +280,6 @@ const styles = StyleSheet.create({
   heroCoverImage: { width: '100%', height: '100%' },
   heroInfo: { flex: 1, padding: 12, justifyContent: 'center' },
   heroButton: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6 },
+  heroTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  heroFill: { height: '100%' },
 });

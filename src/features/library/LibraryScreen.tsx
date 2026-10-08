@@ -30,7 +30,9 @@ import { getFavoriteIds } from './favorites';
 import { CustomListsModal } from './components/CustomListsModal';
 import { CustomList, getCustomLists } from './customLists';
 import { useGridColumns } from '@shared/utils/useGridColumns';
-import { Chip, EmptyState } from '@shared/components';
+import { Chip, EmptyState, SegmentedControl } from '@shared/components';
+import { DownloadsSection } from './components/DownloadsSection';
+import { ListsSection } from './components/ListsSection';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
 import { SeriesGridItem } from './components/SeriesGridItem';
@@ -40,6 +42,14 @@ const PAGE_SIZE = 24;
 const VIEW_MODE_KEY = 'bunker616.libraryViewMode';
 
 type ViewMode = 'grid' | 'list';
+
+type LibrarySection = 'biblioteca' | 'listas' | 'descargas';
+
+const SECTION_OPTIONS: { value: LibrarySection; label: string }[] = [
+  { value: 'biblioteca', label: 'Biblioteca' },
+  { value: 'listas', label: 'Mis listas' },
+  { value: 'descargas', label: 'Descargas' },
+];
 
 const SORT_OPTIONS: { value: SeriesSort; label: string }[] = [
   { value: 'title', label: 'Título' },
@@ -68,6 +78,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [customLists, setCustomLists] = useState<CustomList[]>([]);
   const [showListsModal, setShowListsModal] = useState(false);
+  const [section, setSection] = useState<LibrarySection>('biblioteca');
   const [browseListId, setBrowseListId] = useState<string | undefined>(undefined);
 
   const reloadCustomLists = () => {
@@ -193,12 +204,32 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const isLoadingSeries = favoritesOnly ? favoritesQuery.isLoading && favoriteIds.length > 0 : seriesQuery.isLoading;
   const isRefetchingSeries = favoritesOnly ? favoritesQuery.isRefetching : seriesQuery.isRefetching && !seriesQuery.isFetchingNextPage;
 
+  const openSeriesFromList = (seriesId: string, seriesTitle: string) =>
+    navigation.navigate('Series', { seriesId, title: seriesTitle });
+
+  if (section !== 'biblioteca') {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <View style={{ paddingHorizontal: spacing.lg }}>
+          <Text style={[typography.largeTitle, { color: colors.label, marginTop: spacing.sm }]}>Biblioteca</Text>
+          <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
+        </View>
+        {section === 'listas' ? (
+          <ListsSection onOpenSeries={openSeriesFromList} />
+        ) : (
+          <DownloadsSection />
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={{ paddingHorizontal: spacing.lg }}>
         <Text style={[typography.largeTitle, { color: colors.label, marginTop: spacing.sm }]}>
           Biblioteca
         </Text>
+        <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
 
         <View style={[styles.searchRow, { marginTop: spacing.md }]}>
           <TextInput

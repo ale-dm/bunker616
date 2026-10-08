@@ -5,3 +5,4 @@ export * from './SectionHeader';
 export * from './Chip';
 export * from './MediaCard';
 export * from './MediaRail';
+export * from './SegmentedControl';
