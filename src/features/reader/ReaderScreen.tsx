@@ -18,7 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getAuthHeader } from '@shared/api/client';
-import { bookPageUrl, bookThumbnailUrl, getBook, getBookPages, getSeriesBooks } from '@shared/api/komga';
+import { bookPageUrl, bookThumbnailUrl, getBook, getBookPages, getSeriesById, getSeriesBooks } from '@shared/api/komga';
 import { CoverImage } from '@shared/components';
 import { BookPage } from '@shared/types/komga';
 import {
@@ -34,21 +34,25 @@ import { savePageToGallery } from '@features/offline/gallery';
 import { PagedReader, PagedReaderRef } from './components/PagedReader';
 import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
-import { getDefaultReadingDirection } from './readingDirection';
 import {
-  getReaderBackground,
   nextReaderBackground,
   READER_BACKGROUND_COLORS,
   ReaderBackground,
   setReaderBackground,
 } from './readerBackground';
 import { PageSource } from './types';
+import {
+  clearSeriesPreset,
+  getPresetStatus,
+  ReaderPrefs,
+  resolvePrefs,
+  savePreset,
+} from './readerPresets';
 import { ReaderChip } from './components/ReaderChip';
 import { Bookmark, getBookmarks, toggleBookmark } from './bookmarks';
 import { cachedPagePath, prefetchPages } from './pagePrefetch';
 import {
   FitMode,
-  getFitMode,
   getNightDimmingEnabled,
   isNightHour,
   setFitMode,
@@ -85,7 +89,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [showInfo, setShowInfo] = useState(false);
   const [showPageGrid, setShowPageGrid] = useState(false);
   const [rtl, setRtl] = useState(false);
-  const [rtlLoaded, setRtlLoaded] = useState(false);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [presetStatus, setPresetStatus] = useState({ series: false, library: false });
   const [doublePage, setDoublePage] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
   const [saving, setSaving] = useState(false);
@@ -97,17 +102,51 @@ export function ReaderScreen({ route, navigation }: Props) {
   const sessionTurnsRef = useRef(0);
   const { record, progress } = useOfflineBook(bookId);
 
+  const seriesQuery = useQuery({
+    queryKey: ['series', seriesId],
+    queryFn: () => getSeriesById(api!, seriesId),
+    enabled: !!api,
+    retry: false,
+  });
+  const libraryId = seriesQuery.data?.libraryId;
+  const seriesSettled = !api || seriesQuery.isSuccess || seriesQuery.isError;
+
+  const applyPrefs = (prefs: ReaderPrefs) => {
+    setReaderMode(prefs.readerMode);
+    setRtl(prefs.rtl);
+    setDoublePage(prefs.doublePage);
+    setFitModeState(prefs.fitMode);
+    setBackground(prefs.background);
+  };
+
   useEffect(() => {
-    getDefaultReadingDirection().then(direction => {
-      setRtl(direction === 'rtl');
-      setRtlLoaded(true);
+    if (!seriesSettled || prefsLoaded) {
+      return;
+    }
+    resolvePrefs(libraryId, seriesId).then(prefs => {
+      applyPrefs(prefs);
+      setPrefsLoaded(true);
     });
-    getReaderBackground().then(setBackground);
-  }, []);
+  }, [seriesSettled, libraryId, seriesId, prefsLoaded]);
+
+  useEffect(() => {
+    getPresetStatus(libraryId, seriesId).then(setPresetStatus);
+  }, [libraryId, seriesId, prefsLoaded]);
+
+  const currentPrefs: ReaderPrefs = { readerMode, rtl, doublePage, fitMode, background };
+
+  const saveForScope = async (type: 'series' | 'library') => {
+    await savePreset({ type, id: type === 'series' ? seriesId : libraryId! }, currentPrefs);
+    setPresetStatus(await getPresetStatus(libraryId, seriesId));
+  };
+
+  const removeSeriesPreset = async () => {
+    await clearSeriesPreset(seriesId);
+    setPresetStatus(await getPresetStatus(libraryId, seriesId));
+  };
 
   useEffect(() => {
     getBookmarks(bookId).then(setBookmarks);
-    getFitMode().then(setFitModeState);
     getNightDimmingEnabled().then(enabled => {
       if (enabled && isNightHour()) {
         setDimIndex(2);
@@ -176,7 +215,7 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   // Un capítulo descargado se abre aunque no haya conexión con el servidor.
   const waitingForServer = !record && (bookQuery.isLoading || pagesQuery.isLoading);
-  if (!credentials || !rtlLoaded || waitingForServer) {
+  if (!credentials || !prefsLoaded || waitingForServer) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator color="#5865f2" size="large" />
@@ -471,6 +510,21 @@ export function ReaderScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             ) : null}
 
+            <Text style={styles.presetTitle}>AJUSTES DE LECTURA</Text>
+            <TouchableOpacity onPress={() => saveForScope('series')} style={styles.offlineButton}>
+              <Text style={styles.offlineButtonText}>Guardar estos ajustes para esta serie</Text>
+            </TouchableOpacity>
+            {!!libraryId && (
+              <TouchableOpacity onPress={() => saveForScope('library')} style={styles.offlineButton}>
+                <Text style={styles.offlineButtonText}>Guardar estos ajustes para toda la biblioteca</Text>
+              </TouchableOpacity>
+            )}
+            {presetStatus.series && (
+              <TouchableOpacity onPress={removeSeriesPreset} style={styles.offlineButton}>
+                <Text style={styles.offlineButtonText}>Quitar ajustes propios de esta serie</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.infoCloseButton} onPress={() => setShowInfo(false)}>
               <Text style={styles.infoCloseText}>Cerrar</Text>
             </TouchableOpacity>
@@ -567,6 +621,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   offlineButtonText: { color: READER_ACCENT, fontWeight: '600' },
+  presetTitle: { color: '#9b9ba1', fontSize: 11, fontWeight: '700', marginBottom: 6 },
   infoCloseButton: {
     backgroundColor: READER_ACCENT,
     borderRadius: 10,

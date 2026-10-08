@@ -1,3 +1,4 @@
+import { seriesCoverUri } from '@features/library/coverStore';
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -5,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { bookThumbnailUrl, getCollections, getSeries, searchBooks, seriesThumbnailUrl } from '@shared/api/komga';
+import { bookThumbnailUrl, getCollections, getSeries, searchBooks } from '@shared/api/komga';
 import { CoverImage, EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 
@@ -108,7 +109,7 @@ export function SearchScreen({ navigation }: Props) {
                     navigation.navigate('Series', { seriesId: series.id, title: series.metadata.title || series.name })
                   }>
                   <View style={[styles.thumb, { borderRadius: radii.sm, backgroundColor: colors.tertiaryBackground }]}>
-                    <CoverImage uri={seriesThumbnailUrl(credentials!.baseUrl, series.id)} style={styles.thumbImage} />
+                    <CoverImage uri={seriesCoverUri(credentials!.baseUrl, series.id)} style={styles.thumbImage} />
                   </View>
                   <Text style={[typography.body, { color: colors.label, flex: 1 }]} numberOfLines={2}>
                     {series.metadata.title || series.name}

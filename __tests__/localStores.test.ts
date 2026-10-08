@@ -85,3 +85,23 @@ describe('custom lists', () => {
     expect((await getCustomLists())[0].seriesIds).toEqual([]);
   });
 });
+
+describe('reader presets', () => {
+  it('resolves series over library over global defaults', async () => {
+    const { savePreset, resolvePrefs } = require('../src/features/reader/readerPresets');
+    const base = await resolvePrefs('lib-1', 'series-1');
+    expect(base.rtl).toBe(false);
+    expect(base.doublePage).toBe(false);
+
+    await savePreset({ type: 'library', id: 'lib-1' }, { ...base, rtl: true });
+    await savePreset({ type: 'series', id: 'series-1' }, { ...base, rtl: false, doublePage: true });
+
+    const inSeries = await resolvePrefs('lib-1', 'series-1');
+    expect(inSeries.rtl).toBe(false);
+    expect(inSeries.doublePage).toBe(true);
+
+    const otherSeries = await resolvePrefs('lib-1', 'series-2');
+    expect(otherSeries.rtl).toBe(true);
+    expect(otherSeries.doublePage).toBe(false);
+  });
+});

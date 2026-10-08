@@ -1,8 +1,8 @@
+import { seriesCoverUri } from '@features/library/coverStore';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Series } from '@shared/types/komga';
 import { CoverImage, Badge } from '@shared/components';
-import { seriesThumbnailUrl } from '@shared/api/komga';
 import { useAuth } from '@features/auth/AuthContext';
 import { useTheme } from '@shared/theme';
 
@@ -26,7 +26,7 @@ export function SeriesListItem({ series, onPress }: Props) {
       onPress={onPress}
       activeOpacity={0.7}>
       <View style={[styles.coverWrapper, { borderRadius: radii.sm, backgroundColor: colors.tertiaryBackground }]}>
-        <CoverImage uri={seriesThumbnailUrl(credentials.baseUrl, series.id)} style={styles.cover} />
+        <CoverImage uri={seriesCoverUri(credentials.baseUrl, series.id)} style={styles.cover} />
         <Badge count={badgeCount} tone={hasProgress ? 'progress' : 'accent'} />
       </View>
       <View style={[styles.info, { marginLeft: spacing.md }]}>

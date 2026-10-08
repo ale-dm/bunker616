@@ -1,3 +1,4 @@
+import { seriesCoverUri } from '@features/library/coverStore';
 import React, { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,8 +14,7 @@ import {
   getSeries,
   getSeriesById,
   getSeriesBooks,
-  seriesThumbnailUrl,
-} from '@shared/api/komga';
+  } from '@shared/api/komga';
 import { Chip, CoverImage, EmptyState, MediaRail, SectionHeader } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { getFavoriteIds } from '@features/library/favorites';
@@ -148,7 +148,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const followingItems = (followedQuery.data ?? []).map(({ series, newCount }) => ({
     id: series.id,
     title: series.metadata.title || series.name,
-    coverUri: seriesThumbnailUrl(baseUrl, series.id),
+    coverUri: seriesCoverUri(baseUrl, series.id),
     subtitle: `${newCount} ${newCount === 1 ? 'nuevo' : 'nuevos'}`,
     subtitleTone: 'progress' as const,
     onPress: () => openSeries(series.id, series.metadata.title || series.name),
@@ -157,7 +157,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const recommendationItems = (recommendationQuery.data?.series ?? []).map(series => ({
     id: series.id,
     title: series.metadata.title || series.name,
-    coverUri: seriesThumbnailUrl(baseUrl, series.id),
+    coverUri: seriesCoverUri(baseUrl, series.id),
     onPress: () => openSeries(series.id, series.metadata.title || series.name),
   }));
 

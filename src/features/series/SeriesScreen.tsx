@@ -1,3 +1,4 @@
+import { hasCustomCover, pickCustomCover, removeCustomCover, seriesCoverUri } from '@features/library/coverStore';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { getBookPages, getSeriesBooks, getSeriesById, seriesThumbnailUrl, updateReadProgress } from '@shared/api/komga';
+import { getBookPages, getSeriesBooks, getSeriesById, updateReadProgress } from '@shared/api/komga';
 import { getAuthHeader } from '@shared/api/client';
 import { downloadBook, getOfflineRecords } from '@features/offline/offlineStore';
 import { markSeriesSeen } from '@features/library/seriesSeen';
@@ -60,6 +61,22 @@ export function SeriesScreen({ route, navigation }: Props) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'inProgress' | 'read'>('all');
   const [note, setNote] = useState('');
   const [showLists, setShowLists] = useState(false);
+  const [, setCoverVersion] = useState(0);
+
+  const onChangeCover = async () => {
+    try {
+      if (await pickCustomCover(seriesId)) {
+        setCoverVersion(v => v + 1);
+      }
+    } catch (error) {
+      Alert.alert('No se pudo cambiar la portada', error instanceof Error ? error.message : 'Error desconocido');
+    }
+  };
+
+  const onRemoveCover = async () => {
+    await removeCustomCover(seriesId);
+    setCoverVersion(v => v + 1);
+  };
   const [seriesDownload, setSeriesDownload] = useState<{ done: number; total: number } | null>(null);
   const cancelDownloadRef = useRef(false);
 
@@ -173,6 +190,44 @@ export function SeriesScreen({ route, navigation }: Props) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: booksQueryKey }),
   });
 
+  const [seriesMarking, setSeriesMarking] = useState<{ done: number; total: number } | null>(null);
+
+  const markWholeSeries = async (completed: boolean) => {
+    if (!api || !booksQuery.data) {
+      return;
+    }
+    const books = booksQuery.data.content.filter(book => !!book.readProgress?.completed !== completed);
+    setSeriesMarking({ done: 0, total: books.length });
+    try {
+      for (let start = 0; start < books.length; start += 5) {
+        const batch = books.slice(start, start + 5);
+        await Promise.all(
+          batch.map(book =>
+            updateReadProgress(api, book.id, { page: completed ? book.media.pagesCount : 0, completed }),
+          ),
+        );
+        setSeriesMarking({ done: Math.min(start + 5, books.length), total: books.length });
+      }
+      await queryClient.invalidateQueries({ queryKey: booksQueryKey });
+    } catch (error) {
+      Alert.alert('No se pudo actualizar', error instanceof Error ? error.message : 'Revisa la conexión.');
+      queryClient.invalidateQueries({ queryKey: booksQueryKey });
+    } finally {
+      setSeriesMarking(null);
+    }
+  };
+
+  const confirmMarkWholeSeries = (completed: boolean) => {
+    Alert.alert(
+      completed ? 'Marcar serie como leída' : 'Marcar serie como no leída',
+      completed ? '¿Marcar todos los números como leídos?' : '¿Quitar el progreso de todos los números?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Aceptar', onPress: () => markWholeSeries(completed) },
+      ],
+    );
+  };
+
   const metadata = seriesQuery.data?.metadata;
   const statusLabel = metadata?.status ? STATUS_LABELS[metadata.status] ?? metadata.status : null;
 
@@ -181,7 +236,7 @@ export function SeriesScreen({ route, navigation }: Props) {
       <View style={styles.topRow}>
         {credentials && (
           <View style={[styles.cover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-            <CoverImage uri={seriesThumbnailUrl(credentials.baseUrl, seriesId)} style={styles.coverImage} />
+            <CoverImage uri={seriesCoverUri(credentials.baseUrl, seriesId)} style={styles.coverImage} />
           </View>
         )}
         <View style={[styles.infoColumn, { marginLeft: spacing.md }]}>
@@ -285,9 +340,35 @@ export function SeriesScreen({ route, navigation }: Props) {
       </View>
       <View style={[styles.controlRow, { marginTop: spacing.md }]}>
         <TouchableOpacity
+          onPress={onChangeCover}
+          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Cambiar portada</Text>
+        </TouchableOpacity>
+        {hasCustomCover(seriesId) && (
+          <TouchableOpacity
+            onPress={onRemoveCover}
+            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+            <Text style={[typography.footnote, { color: colors.danger, fontWeight: '600' }]}>Quitar portada</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
           onPress={() => setShowLists(true)}
           style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
           <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Añadir a lista</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => confirmMarkWholeSeries(true)}
+          disabled={!!seriesMarking}
+          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
+            {seriesMarking ? `Marcando ${seriesMarking.done}/${seriesMarking.total}…` : 'Marcar serie leída'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => confirmMarkWholeSeries(false)}
+          disabled={!!seriesMarking}
+          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Marcar sin leer</Text>
         </TouchableOpacity>
         {seriesDownload ? (
           <TouchableOpacity
