@@ -18,7 +18,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getAuthHeader } from '@shared/api/client';
-import { getBook, getBookPages, bookPageUrl } from '@shared/api/komga';
+import { bookPageUrl, bookThumbnailUrl, getBook, getBookPages, getSeriesBooks } from '@shared/api/komga';
+import { CoverImage } from '@shared/components';
 import { BookPage } from '@shared/types/komga';
 import {
   deleteOfflineBook,
@@ -34,7 +35,20 @@ import { PagedReader, PagedReaderRef } from './components/PagedReader';
 import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
 import { getDefaultReadingDirection } from './readingDirection';
+import {
+  getReaderBackground,
+  nextReaderBackground,
+  READER_BACKGROUND_COLORS,
+  ReaderBackground,
+  setReaderBackground,
+} from './readerBackground';
 import { PageSource } from './types';
+
+const BACKGROUND_LABELS: Record<ReaderBackground, string> = {
+  black: 'Negro',
+  sepia: 'Sepia',
+  white: 'Blanco',
+};
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
 type ReaderMode = 'paged' | 'webtoon';
@@ -44,7 +58,7 @@ type ReaderMode = 'paged' | 'webtoon';
 const DIM_LEVELS = [0, 0.15, 0.35, 0.55, 0.75];
 
 export function ReaderScreen({ route, navigation }: Props) {
-  const { bookId, title } = route.params;
+  const { bookId, title, seriesId } = route.params;
   const { api, credentials } = useAuth();
   const insets = useSafeAreaInsets();
   const pagedRef = useRef<PagedReaderRef>(null);
@@ -60,6 +74,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [doublePage, setDoublePage] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
   const [saving, setSaving] = useState(false);
+  const [background, setBackground] = useState<ReaderBackground>('black');
   const { record, progress } = useOfflineBook(bookId);
 
   useEffect(() => {
@@ -67,7 +82,15 @@ export function ReaderScreen({ route, navigation }: Props) {
       setRtl(direction === 'rtl');
       setRtlLoaded(true);
     });
+    getReaderBackground().then(setBackground);
   }, []);
+
+  const cycleBackground = () => {
+    const next = nextReaderBackground(background);
+    setBackground(next);
+    setReaderBackground(next);
+  };
+  const backgroundColor = READER_BACKGROUND_COLORS[background];
 
   const bookQuery = useQuery({
     queryKey: ['book', bookId],
@@ -91,6 +114,16 @@ export function ReaderScreen({ route, navigation }: Props) {
     }
     return Math.min(Math.max(progressInfo.page - 1, 0), pages.length - 1);
   }, [bookQuery.data, pages.length]);
+
+  const isAtEnd = pages.length > 0 && (activePageIndex ?? initialIndex) === pages.length - 1;
+  const seriesBooksQuery = useQuery({
+    queryKey: ['series', seriesId, 'books', 'reader'],
+    queryFn: () => getSeriesBooks(api!, seriesId, 0, 500),
+    enabled: !!api && isAtEnd,
+  });
+  const currentBookIndex = seriesBooksQuery.data?.content.findIndex(b => b.id === bookId) ?? -1;
+  const nextBook =
+    currentBookIndex >= 0 ? seriesBooksQuery.data?.content[currentBookIndex + 1] : undefined;
 
   // Un capítulo descargado se abre aunque no haya conexión con el servidor.
   const waitingForServer = !record && (bookQuery.isLoading || pagesQuery.isLoading);
@@ -175,7 +208,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor }]}>
       <StatusBar hidden={!showOverlay} />
 
       {readerMode === 'paged' ? (
@@ -185,6 +218,7 @@ export function ReaderScreen({ route, navigation }: Props) {
           getPageSource={getPageSource}
           rtl={rtl}
           doublePage={doublePage}
+          backgroundColor={backgroundColor}
           initialPageIndex={initialIndex}
           onPageIndexChange={handlePageIndexChange}
           onTapCenter={() => setShowOverlay(v => !v)}
@@ -194,6 +228,7 @@ export function ReaderScreen({ route, navigation }: Props) {
           ref={webtoonRef}
           pages={pages}
           getPageSource={getPageSource}
+          backgroundColor={backgroundColor}
           initialPageIndex={initialIndex}
           onPageIndexChange={handlePageIndexChange}
           onTapCenter={() => setShowOverlay(v => !v)}
@@ -205,6 +240,31 @@ export function ReaderScreen({ route, navigation }: Props) {
           pointerEvents="none"
           style={[styles.dimOverlay, { opacity: DIM_LEVELS[dimIndex] }]}
         />
+      )}
+
+      {isAtEnd && nextBook && (
+        <View style={[styles.nextCard, { bottom: insets.bottom + 120 }]}>
+          <View style={styles.nextCover}>
+            <CoverImage uri={bookThumbnailUrl(credentials.baseUrl, nextBook.id)} style={styles.nextCoverImage} />
+          </View>
+          <View style={styles.nextInfo}>
+            <Text style={styles.nextLabel}>SIGUIENTE</Text>
+            <Text style={styles.nextTitle} numberOfLines={2}>
+              {nextBook.metadata.title || nextBook.name}
+            </Text>
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={() =>
+                navigation.replace('Reader', {
+                  bookId: nextBook.id,
+                  title: nextBook.metadata.title || nextBook.name,
+                  seriesId,
+                })
+              }>
+              <Text style={styles.nextButtonText}>Leer ▸</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
 
       {showOverlay && (
@@ -262,6 +322,9 @@ export function ReaderScreen({ route, navigation }: Props) {
               )}
               <TouchableOpacity onPress={savePage} disabled={saving} style={styles.chipButton}>
                 <Text style={styles.chipText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={cycleBackground} style={styles.chipButton}>
+                <Text style={styles.chipText}>Fondo: {BACKGROUND_LABELS[background]}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.brightnessRow}>
@@ -368,7 +431,7 @@ export function ReaderScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1 },
   loaderContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -491,4 +554,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c1e',
   },
   gridPageNumber: { color: '#9b9ba1', fontSize: 11, textAlign: 'center', marginTop: 4 },
+  nextCard: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(28,28,30,0.95)',
+    borderRadius: 14,
+    padding: 10,
+  },
+  nextCover: { width: 70, aspectRatio: 2 / 3, borderRadius: 6, overflow: 'hidden' },
+  nextCoverImage: { width: '100%', height: '100%' },
+  nextInfo: { flex: 1, marginLeft: 12, justifyContent: 'center' },
+  nextLabel: { color: '#FF9F0A', fontSize: 11, fontWeight: '700' },
+  nextTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 2 },
+  nextButton: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#5865f2',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  nextButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

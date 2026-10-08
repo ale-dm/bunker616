@@ -23,13 +23,14 @@ interface Props {
   getPageSource: (page: BookPage) => PageSource;
   rtl: boolean;
   doublePage: boolean;
+  backgroundColor: string;
   initialPageIndex: number;
   onPageIndexChange: (pageIndex: number) => void;
   onTapCenter: () => void;
 }
 
 export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReaderImpl(
-  { pages, getPageSource, rtl, doublePage, initialPageIndex, onPageIndexChange, onTapCenter },
+  { pages, getPageSource, rtl, doublePage, backgroundColor, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
   const pagerRef = useRef<PagerView>(null);
@@ -110,7 +111,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
           const page = pages[group[0]];
           return (
             <View key={key} collapsable={false}>
-              <ZoomablePage source={getPageSource(page)} onTap={handleTap} />
+              <ZoomablePage source={getPageSource(page)} onTap={handleTap} backgroundColor={backgroundColor} />
             </View>
           );
         }
@@ -125,6 +126,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
                   key={page.number}
                   source={getPageSource(page)}
                   onTap={handleTap}
+                  backgroundColor={backgroundColor}
                   width={half}
                   xOffset={slot * half}
                 />

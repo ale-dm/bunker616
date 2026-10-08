@@ -22,6 +22,7 @@ interface Props {
   width?: number;
   height?: number;
   xOffset?: number;
+  backgroundColor?: string;
 }
 
 function clampTranslation(
@@ -40,6 +41,7 @@ export function ZoomablePage({
   width = SCREEN_W,
   height = SCREEN_H,
   xOffset = 0,
+  backgroundColor = '#000000',
 }: Props) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -114,7 +116,7 @@ export function ZoomablePage({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.container, { width, height }]}>
+      <Animated.View style={[styles.container, { width, height, backgroundColor }]}>
         <Animated.Image
           source={source}
           style={[styles.image, { width, height }, animatedStyle]}
@@ -129,7 +131,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000',
   },
   image: {},
 });

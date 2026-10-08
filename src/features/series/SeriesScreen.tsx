@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { getSeriesBooks, getSeriesById, seriesThumbnailUrl, updateReadProgress } from '@shared/api/komga';
+import { getBookPages, getSeriesBooks, getSeriesById, seriesThumbnailUrl, updateReadProgress } from '@shared/api/komga';
+import { getAuthHeader } from '@shared/api/client';
+import { downloadBook, getOfflineRecords } from '@features/offline/offlineStore';
 import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
 import { CoverImage } from '@shared/components';
 import { useTheme } from '@shared/theme';
@@ -20,6 +22,18 @@ const STATUS_LABELS: Record<string, string> = {
   ABANDONED: 'Abandonada',
 };
 
+const SORT_OPTIONS: { value: 'number' | 'date'; label: string }[] = [
+  { value: 'number', label: 'Por número' },
+  { value: 'date', label: 'Por fecha' },
+];
+
+const STATUS_FILTERS: { value: 'all' | 'unread' | 'inProgress' | 'read'; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'unread', label: 'Sin leer' },
+  { value: 'inProgress', label: 'En progreso' },
+  { value: 'read', label: 'Leídos' },
+];
+
 export function SeriesScreen({ route, navigation }: Props) {
   const { seriesId, title } = route.params;
   const { api, credentials } = useAuth();
@@ -28,6 +42,10 @@ export function SeriesScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
   const [isFavorite, setIsFavorite] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [sortMode, setSortMode] = useState<'number' | 'date'>('number');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'inProgress' | 'read'>('all');
+  const [seriesDownload, setSeriesDownload] = useState<{ done: number; total: number } | null>(null);
+  const cancelDownloadRef = useRef(false);
 
   useEffect(() => {
     getFavoriteIds().then(ids => setIsFavorite(ids.includes(seriesId)));
@@ -48,9 +66,62 @@ export function SeriesScreen({ route, navigation }: Props) {
 
   const booksQuery = useQuery({
     queryKey: booksQueryKey,
-    queryFn: () => getSeriesBooks(api!, seriesId),
+    queryFn: () => getSeriesBooks(api!, seriesId, 0, 500),
     enabled: !!api,
   });
+
+  const visibleBooks = useMemo(() => {
+    const books = booksQuery.data?.content ?? [];
+    const filtered = books.filter(book => {
+      const progress = book.readProgress;
+      switch (statusFilter) {
+        case 'unread':
+          return !progress;
+        case 'inProgress':
+          return !!progress && !progress.completed;
+        case 'read':
+          return !!progress?.completed;
+        default:
+          return true;
+      }
+    });
+    if (sortMode === 'date') {
+      return [...filtered].sort((a, b) => (a.metadata.releaseDate ?? '').localeCompare(b.metadata.releaseDate ?? ''));
+    }
+    return filtered;
+  }, [booksQuery.data, sortMode, statusFilter]);
+
+  const downloadSeries = async () => {
+    if (!api || !credentials || !booksQuery.data) {
+      return;
+    }
+    const authHeader = getAuthHeader(credentials);
+    const downloaded = new Set((await getOfflineRecords()).map(record => record.bookId));
+    const pending = booksQuery.data.content.filter(book => !downloaded.has(book.id));
+    cancelDownloadRef.current = false;
+    setSeriesDownload({ done: 0, total: pending.length });
+    try {
+      for (let index = 0; index < pending.length; index++) {
+        if (cancelDownloadRef.current) {
+          break;
+        }
+        const book = pending[index];
+        const pages = await getBookPages(api, book.id);
+        await downloadBook({
+          baseUrl: credentials.baseUrl,
+          authHeader,
+          bookId: book.id,
+          title: book.metadata.title || book.name,
+          pages,
+        });
+        setSeriesDownload({ done: index + 1, total: pending.length });
+      }
+    } catch (error) {
+      Alert.alert('Descarga fallida', error instanceof Error ? error.message : 'Revisa la conexión e inténtalo de nuevo.');
+    } finally {
+      setSeriesDownload(null);
+    }
+  };
 
   const toggleReadMutation = useMutation({
     mutationFn: ({
@@ -131,6 +202,58 @@ export function SeriesScreen({ route, navigation }: Props) {
           </Text>
         </TouchableOpacity>
       )}
+
+      <View style={[styles.controlRow, { marginTop: spacing.lg }]}>
+        {SORT_OPTIONS.map(option => (
+          <TouchableOpacity
+            key={option.value}
+            onPress={() => setSortMode(option.value)}
+            style={[
+              styles.controlChip,
+              { borderRadius: radii.pill, backgroundColor: sortMode === option.value ? colors.accent : colors.secondaryBackground },
+            ]}>
+            <Text style={[typography.footnote, { color: sortMode === option.value ? '#FFFFFF' : colors.label }]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[styles.controlRow, { marginTop: spacing.sm }]}>
+        {STATUS_FILTERS.map(option => (
+          <TouchableOpacity
+            key={option.value}
+            onPress={() => setStatusFilter(option.value)}
+            style={[
+              styles.controlChip,
+              { borderRadius: radii.pill, backgroundColor: statusFilter === option.value ? colors.accent : colors.secondaryBackground },
+            ]}>
+            <Text style={[typography.footnote, { color: statusFilter === option.value ? '#FFFFFF' : colors.label }]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[styles.controlRow, { marginTop: spacing.md }]}>
+        {seriesDownload ? (
+          <TouchableOpacity
+            onPress={() => {
+              cancelDownloadRef.current = true;
+            }}
+            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+            <Text style={[typography.footnote, { color: colors.label }]}>
+              Descargando serie {seriesDownload.done}/{seriesDownload.total} · Cancelar
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={downloadSeries}
+            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+            <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
+              Descargar serie para leer sin conexión
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 
@@ -140,7 +263,7 @@ export function SeriesScreen({ route, navigation }: Props) {
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : (
         <FlatList
-          data={booksQuery.data?.content ?? []}
+          data={visibleBooks}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingTop: spacing.sm }}
           ListHeaderComponent={infoHeader}
@@ -192,4 +315,6 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'flex-start' },
   genreWrap: { flexDirection: 'row', flexWrap: 'wrap' },
   genreChip: { paddingHorizontal: 10, paddingVertical: 4, marginRight: 6, marginBottom: 6 },
+  controlRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  controlChip: { paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, marginBottom: 4 },
 });

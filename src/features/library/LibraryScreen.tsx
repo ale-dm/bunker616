@@ -27,6 +27,7 @@ import {
   SeriesSort,
 } from '@shared/api/komga';
 import { getFavoriteIds } from './favorites';
+import { useGridColumns } from '@shared/utils/useGridColumns';
 import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
@@ -55,6 +56,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const { api } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
+  const columns = useGridColumns();
   const [libraryId, setLibraryId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SeriesSort>('title');
@@ -438,7 +440,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           key={viewMode}
           data={series}
           keyExtractor={item => item.id}
-          numColumns={viewMode === 'grid' ? 3 : 1}
+          numColumns={viewMode === 'grid' ? columns : 1}
           columnWrapperStyle={viewMode === 'grid' ? styles.row : undefined}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl }}
           ItemSeparatorComponent={
@@ -462,7 +464,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
                 title: item.metadata.title || item.name,
               });
             return viewMode === 'grid' ? (
-              <SeriesGridItem series={item} onPress={onPress} />
+              <SeriesGridItem series={item} onPress={onPress} columns={columns} />
             ) : (
               <SeriesListItem series={item} onPress={onPress} />
             );

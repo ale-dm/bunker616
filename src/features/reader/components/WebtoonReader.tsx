@@ -14,13 +14,14 @@ export interface WebtoonReaderRef {
 interface Props {
   pages: BookPage[];
   getPageSource: (page: BookPage) => PageSource;
+  backgroundColor: string;
   initialPageIndex: number;
   onPageIndexChange: (pageIndex: number) => void;
   onTapCenter: () => void;
 }
 
 export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function WebtoonReaderImpl(
-  { pages, getPageSource, initialPageIndex, onPageIndexChange, onTapCenter },
+  { pages, getPageSource, backgroundColor, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
   const listRef = useRef<FlatList<BookPage>>(null);
@@ -63,7 +64,7 @@ export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function Webtoo
           <TouchableOpacity activeOpacity={1} onPress={onTapCenter}>
             <Image
               source={getPageSource(item)}
-              style={{ width: SCREEN_W, height: SCREEN_W * aspect, backgroundColor: '#000' }}
+              style={{ width: SCREEN_W, height: SCREEN_W * aspect, backgroundColor }}
               resizeMode="contain"
             />
           </TouchableOpacity>

@@ -9,9 +9,10 @@ import { useTheme } from '@shared/theme';
 interface Props {
   series: Series;
   onPress: () => void;
+  columns?: number;
 }
 
-export function SeriesGridItem({ series, onPress }: Props) {
+export function SeriesGridItem({ series, onPress, columns = 3 }: Props) {
   const { credentials } = useAuth();
   const { colors, radii, typography, spacing } = useTheme();
   if (!credentials) {
@@ -21,7 +22,7 @@ export function SeriesGridItem({ series, onPress }: Props) {
   const badgeCount = hasProgress ? series.booksInProgressCount : series.booksUnreadCount;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={[styles.card, { width: `${100 / columns - 2}%` }]} onPress={onPress} activeOpacity={0.8}>
       <View style={[styles.shadowWrapper, { shadowColor: colors.label }]}>
         <View
           style={[
@@ -42,7 +43,7 @@ export function SeriesGridItem({ series, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { width: '31%', marginBottom: 18 },
+  card: { marginBottom: 18 },
   shadowWrapper: {
     aspectRatio: 2 / 3,
     ...Platform.select({

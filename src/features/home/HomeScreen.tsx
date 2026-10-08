@@ -8,6 +8,7 @@ import { bookThumbnailUrl, getBooksInProgress, getSeries } from '@shared/api/kom
 import { CoverImage, EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
+import { useGridColumns } from '@shared/utils/useGridColumns';
 
 // Accesos rápidos por género, al estilo de los módulos "Characters" /
 // "Creators" de Marvel Unlimited: entradas temáticas a la biblioteca en
@@ -27,6 +28,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const { api, credentials } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
+  const columns = useGridColumns();
 
   const inProgressQuery = useQuery({
     queryKey: ['home', 'in-progress'],
@@ -160,13 +162,14 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           <FlatList
             data={recentQuery.data?.content ?? []}
             keyExtractor={item => item.id}
-            numColumns={3}
+            numColumns={columns}
             scrollEnabled={false}
             columnWrapperStyle={styles.row}
             contentContainerStyle={{ paddingHorizontal: spacing.lg }}
             renderItem={({ item }) => (
               <SeriesGridItem
                 series={item}
+                columns={columns}
                 onPress={() =>
                   navigation.navigate('Series', { seriesId: item.id, title: item.metadata.title || item.name })
                 }

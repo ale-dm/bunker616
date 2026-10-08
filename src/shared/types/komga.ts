@@ -75,6 +75,8 @@ export interface Book {
   metadata: {
     title: string;
     number: string;
+    numberSort?: number;
+    releaseDate?: string;
     summary?: string;
     authors?: Author[];
   };

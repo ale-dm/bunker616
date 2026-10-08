@@ -10,6 +10,7 @@ import { EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
+import { useGridColumns } from '@shared/utils/useGridColumns';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Collection'>;
 
@@ -20,6 +21,7 @@ export function CollectionScreen({ route, navigation }: Props) {
   const { api } = useAuth();
   const { colors, spacing, typography } = useTheme();
   const insets = useSafeAreaInsets();
+  const columns = useGridColumns();
 
   const seriesQuery = useInfiniteQuery({
     queryKey: ['collection', collectionId, 'series'],
@@ -51,7 +53,7 @@ export function CollectionScreen({ route, navigation }: Props) {
         <FlatList
           data={series}
           keyExtractor={item => item.id}
-          numColumns={3}
+          numColumns={columns}
           columnWrapperStyle={styles.row}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}
           refreshControl={
@@ -71,6 +73,7 @@ export function CollectionScreen({ route, navigation }: Props) {
           }}
           renderItem={({ item }) => (
             <SeriesGridItem
+              columns={columns}
               series={item}
               onPress={() =>
                 navigation.navigate('Series', {
