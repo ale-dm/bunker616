@@ -43,6 +43,8 @@ import {
   setReaderBackground,
 } from './readerBackground';
 import { PageSource } from './types';
+import { Bookmark, getBookmarks, toggleBookmark } from './bookmarks';
+import { recordPageTurn } from '@features/history/readingLog';
 
 const BACKGROUND_LABELS: Record<ReaderBackground, string> = {
   black: 'Negro',
@@ -75,6 +77,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
   const [saving, setSaving] = useState(false);
   const [background, setBackground] = useState<ReaderBackground>('black');
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const { record, progress } = useOfflineBook(bookId);
 
   useEffect(() => {
@@ -84,6 +87,10 @@ export function ReaderScreen({ route, navigation }: Props) {
     });
     getReaderBackground().then(setBackground);
   }, []);
+
+  useEffect(() => {
+    getBookmarks(bookId).then(setBookmarks);
+  }, [bookId]);
 
   const cycleBackground = () => {
     const next = nextReaderBackground(background);
@@ -141,10 +148,18 @@ export function ReaderScreen({ route, navigation }: Props) {
   const bookTitle = bookQuery.data?.metadata.title || title;
 
   const handlePageIndexChange = (pageIndex: number) => {
-    setActivePageIndex(pageIndex);
-    if (!incognito) {
+    if (!incognito && pageIndex !== activeIndex) {
+      recordPageTurn();
       reportPage(pageIndex);
     }
+    setActivePageIndex(pageIndex);
+  };
+
+  const isBookmarked = bookmarks.some(bookmark => bookmark.pageIndex === activeIndex);
+
+  const onToggleBookmark = async () => {
+    await toggleBookmark(bookId, activeIndex);
+    setBookmarks(await getBookmarks(bookId));
   };
 
   const goToPage = (pageIndex: number) => {
@@ -320,6 +335,11 @@ export function ReaderScreen({ route, navigation }: Props) {
                   </TouchableOpacity>
                 </>
               )}
+              <TouchableOpacity onPress={onToggleBookmark} style={styles.chipButton}>
+                <Text style={[styles.chipText, isBookmarked && styles.chipTextActive]}>
+                  {isBookmarked ? '★ Marcada' : '☆ Marcar'}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={savePage} disabled={saving} style={styles.chipButton}>
                 <Text style={styles.chipText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
               </TouchableOpacity>
@@ -372,6 +392,22 @@ export function ReaderScreen({ route, navigation }: Props) {
               </Text>
             </ScrollView>
             <Text style={styles.infoPages}>{pages.length} páginas</Text>
+
+            {bookmarks.length > 0 && (
+              <ScrollView style={styles.bookmarkList}>
+                {bookmarks.map(bookmark => (
+                  <TouchableOpacity
+                    key={bookmark.pageIndex}
+                    style={styles.bookmarkItem}
+                    onPress={() => {
+                      setShowInfo(false);
+                      goToPage(bookmark.pageIndex);
+                    }}>
+                    <Text style={styles.bookmarkText}>★ Página {bookmark.pageIndex + 1}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
 
             {progress ? (
               <Text style={styles.offlineText}>
@@ -476,6 +512,9 @@ const styles = StyleSheet.create({
   infoSummary: { color: '#d1d1d6', fontSize: 14, lineHeight: 20 },
   infoPages: { color: '#9b9ba1', fontSize: 12, marginBottom: 12 },
   offlineText: { color: '#9b9ba1', fontSize: 13, marginBottom: 12 },
+  bookmarkList: { maxHeight: 120, marginBottom: 12 },
+  bookmarkItem: { paddingVertical: 8 },
+  bookmarkText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
   offlineButton: {
     borderWidth: 1,
     borderColor: '#5865f2',

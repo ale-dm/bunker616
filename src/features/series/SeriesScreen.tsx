@@ -8,6 +8,7 @@ import { useAuth } from '@features/auth/AuthContext';
 import { getBookPages, getSeriesBooks, getSeriesById, seriesThumbnailUrl, updateReadProgress } from '@shared/api/komga';
 import { getAuthHeader } from '@shared/api/client';
 import { downloadBook, getOfflineRecords } from '@features/offline/offlineStore';
+import { markSeriesSeen } from '@features/library/seriesSeen';
 import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
 import { CoverImage } from '@shared/components';
 import { useTheme } from '@shared/theme';
@@ -49,6 +50,10 @@ export function SeriesScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     getFavoriteIds().then(ids => setIsFavorite(ids.includes(seriesId)));
+  }, [seriesId]);
+
+  useEffect(() => () => {
+    markSeriesSeen(seriesId);
   }, [seriesId]);
 
   const onToggleFavorite = async () => {

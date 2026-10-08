@@ -14,6 +14,7 @@ export type RootStackParamList = {
   Tabs: undefined;
   Series: { seriesId: string; title: string };
   Reader: { bookId: string; title: string; seriesId: string };
+  Search: undefined;
   Collection: { collectionId: string; title: string };
   ReadList: { readListId: string; title: string };
   AddServer: undefined;

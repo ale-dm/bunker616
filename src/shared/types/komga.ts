@@ -68,6 +68,7 @@ export interface Book {
   libraryId: string;
   name: string;
   number: number;
+  created?: string;
   media: {
     status: string;
     pagesCount: number;

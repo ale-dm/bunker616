@@ -10,6 +10,7 @@ import {
   setDefaultReadingDirection,
 } from '@features/reader/readingDirection';
 import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
+import { getReadStats, ReadStats } from '@features/history/readingLog';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { ThemePreference, useTheme } from '@shared/theme';
 
@@ -52,6 +53,10 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
     setAppLockEnabled(value);
   };
 
+  const [readStats, setReadStats] = useState<ReadStats | null>(null);
+  useEffect(() => {
+    getReadStats().then(setReadStats);
+  }, []);
   const offlineRecords = useOfflineRecords();
   const offlineBytes = offlineRecords.reduce((sum, record) => sum + record.bytes, 0);
 
@@ -180,6 +185,29 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
               </TouchableOpacity>
             );
           })}
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          LECTURA
+        </Text>
+        <View style={[styles.card, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          {readStats ? (
+            <>
+              <View style={styles.row}>
+                <Text style={[typography.body, { color: colors.label }]}>Páginas hoy</Text>
+                <Text style={[typography.body, { color: colors.label, fontWeight: '600' }]}>{readStats.today}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={[typography.body, { color: colors.label }]}>Racha</Text>
+                <Text style={[typography.body, { color: colors.label, fontWeight: '600' }]}>
+                  {readStats.streak} {readStats.streak === 1 ? 'día' : 'días'}
+                </Text>
+              </View>
+              <Text style={[typography.footnote, { color: colors.secondaryLabel, marginTop: spacing.sm }]}>
+                Últimos 7 días: {readStats.last7Days.join(' · ')} páginas
+              </Text>
+            </>
+          ) : null}
         </View>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>

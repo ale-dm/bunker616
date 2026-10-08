@@ -11,6 +11,7 @@ import { SeriesScreen } from '@features/series/SeriesScreen';
 import { ReaderScreen } from '@features/reader/ReaderScreen';
 import { CollectionScreen } from '@features/collections/CollectionScreen';
 import { ReadListScreen } from '@features/collections/ReadListScreen';
+import { SearchScreen } from '@features/search/SearchScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { useTheme } from '@shared/theme';
 import { RootStackParamList, TabParamList } from './types';
@@ -96,6 +97,7 @@ export function RootNavigator() {
           <Stack.Screen name="Series" component={SeriesScreen} />
           <Stack.Screen name="Collection" component={CollectionScreen} />
           <Stack.Screen name="ReadList" component={ReadListScreen} />
+          <Stack.Screen name="Search" component={SearchScreen} />
           <Stack.Screen name="Reader" component={ReaderScreen} />
           <Stack.Screen name="AddServer" options={{ presentation: 'modal' }}>
             {({ navigation }) => <LoginScreen onSuccess={() => navigation.goBack()} />}

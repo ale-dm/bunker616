@@ -1,10 +1,21 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
-import { bookThumbnailUrl, getBooksInProgress, getSeries } from '@shared/api/komga';
+import {
+  bookThumbnailUrl,
+  getBooksInProgress,
+  getSeries,
+  getSeriesById,
+  getSeriesBooks,
+  seriesThumbnailUrl,
+  buildSeriesSearchQuery,
+} from '@shared/api/komga';
+import { getFavoriteIds } from '@features/library/favorites';
+import { getSeriesLastSeen } from '@features/library/seriesSeen';
 import { CoverImage, EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
@@ -43,6 +54,58 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     enabled: !!api,
   });
 
+  const queryClient = useQueryClient();
+  const followedQuery = useQuery({
+    queryKey: ['home', 'following'],
+    queryFn: async () => {
+      const ids = await getFavoriteIds();
+      const lastSeen = await getSeriesLastSeen();
+      const entries = await Promise.all(
+        ids.map(async id => {
+          const [series, books] = await Promise.all([getSeriesById(api!, id), getSeriesBooks(api!, id, 0, 500)]);
+          const since = lastSeen[id] ? Date.parse(lastSeen[id]) : undefined;
+          const newCount =
+            since === undefined ? 0 : books.content.filter(b => b.created && Date.parse(b.created) > since).length;
+          return { series, newCount };
+        }),
+      );
+      return entries.filter(entry => entry.newCount > 0);
+    },
+    enabled: !!api,
+  });
+
+  const readingSeriesIds = [...new Set((inProgressQuery.data?.content ?? []).map(book => book.seriesId))].slice(0, 5);
+  const recommendationQuery = useQuery({
+    queryKey: ['home', 'recommendations', readingSeriesIds.join(',')],
+    queryFn: async () => {
+      const readingSeries = await Promise.all(readingSeriesIds.map(id => getSeriesById(api!, id)));
+      const genreCounts = new Map<string, number>();
+      readingSeries.forEach(series =>
+        (series.metadata.genres ?? []).forEach(genre => genreCounts.set(genre, (genreCounts.get(genre) ?? 0) + 1)),
+      );
+      const topGenre = [...genreCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (!topGenre) {
+        return null;
+      }
+      const result = await getSeries(api!, {
+        search: buildSeriesSearchQuery({ genre: topGenre }),
+        size: 12,
+        sort: 'title',
+      });
+      const candidates = result.content.filter(
+        series => series.booksReadCount === 0 && !readingSeriesIds.includes(series.id),
+      );
+      return candidates.length ? { genre: topGenre, series: candidates } : null;
+    },
+    enabled: !!api && readingSeriesIds.length > 0,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['home', 'following'] });
+    }, [queryClient]),
+  );
+
   const inProgressItems = inProgressQuery.isError ? [] : inProgressQuery.data?.content ?? [];
   const heroItem = inProgressItems[0];
   const railItems = inProgressItems.slice(1);
@@ -59,9 +122,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.headerBanner, { paddingTop: insets.top + spacing.sm }]}>
         <View style={[styles.headerStripe, { backgroundColor: colors.progress }]} />
-        <Text style={[typography.largeTitle, styles.headerTitle, { color: colors.label, paddingHorizontal: spacing.lg }]}>
-          Inicio
-        </Text>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.lg }]}>
+          <Text style={[typography.largeTitle, styles.headerTitle, { color: colors.label }]}>Inicio</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Search')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={{ fontSize: 22, color: colors.accent }}>⌕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
@@ -122,6 +188,78 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   </View>
                   <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
                     {item.metadata.title || item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </>
+        )}
+
+        {!!recommendationQuery.data && (
+          <>
+            <Text
+              style={[
+                typography.headline,
+                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
+              ]}>
+              Porque lees {recommendationQuery.data.genre}
+            </Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+              data={recommendationQuery.data.series}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.continueCard}
+                  onPress={() =>
+                    navigation.navigate('Series', { seriesId: item.id, title: item.metadata.title || item.name })
+                  }>
+                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
+                    <CoverImage uri={seriesThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
+                  </View>
+                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
+                    {item.metadata.title || item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </>
+        )}
+
+        {!!followedQuery.data?.length && (
+          <>
+            <Text
+              style={[
+                typography.headline,
+                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
+              ]}>
+              Siguiendo
+            </Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+              data={followedQuery.data}
+              keyExtractor={item => item.series.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.continueCard}
+                  onPress={() =>
+                    navigation.navigate('Series', {
+                      seriesId: item.series.id,
+                      title: item.series.metadata.title || item.series.name,
+                    })
+                  }>
+                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
+                    <CoverImage uri={seriesThumbnailUrl(credentials!.baseUrl, item.series.id)} style={styles.continueCoverImage} />
+                  </View>
+                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
+                    {item.series.metadata.title || item.series.name}
+                  </Text>
+                  <Text style={[typography.caption, { color: colors.progress, fontWeight: '700' }]}>
+                    {item.newCount} {item.newCount === 1 ? 'nuevo' : 'nuevos'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -198,6 +336,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-18deg' }],
   },
   headerTitle: { paddingBottom: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   row: { justifyContent: 'space-between' },
   continueCard: { width: 110, marginRight: 12 },
   continueCover: { aspectRatio: 2 / 3, overflow: 'hidden' },
