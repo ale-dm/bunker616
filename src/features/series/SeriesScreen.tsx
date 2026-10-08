@@ -23,7 +23,7 @@ import { markSeriesSeen } from '@features/library/seriesSeen';
 import { getSeriesNote, setSeriesNote } from './seriesNotes';
 import { CustomListsModal } from '@features/library/components/CustomListsModal';
 import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
-import { CoverImage } from '@shared/components';
+import { Chip, CoverImage } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { BookListItem } from './components/BookListItem';
 
@@ -265,32 +265,22 @@ export function SeriesScreen({ route, navigation }: Props) {
 
       <View style={[styles.controlRow, { marginTop: spacing.lg }]}>
         {SORT_OPTIONS.map(option => (
-          <TouchableOpacity
+          <Chip
             key={option.value}
+            label={option.label}
+            active={sortMode === option.value}
             onPress={() => setSortMode(option.value)}
-            style={[
-              styles.controlChip,
-              { borderRadius: radii.pill, backgroundColor: sortMode === option.value ? colors.accent : colors.secondaryBackground },
-            ]}>
-            <Text style={[typography.footnote, { color: sortMode === option.value ? '#FFFFFF' : colors.label }]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
       <View style={[styles.controlRow, { marginTop: spacing.sm }]}>
         {STATUS_FILTERS.map(option => (
-          <TouchableOpacity
+          <Chip
             key={option.value}
+            label={option.label}
+            active={statusFilter === option.value}
             onPress={() => setStatusFilter(option.value)}
-            style={[
-              styles.controlChip,
-              { borderRadius: radii.pill, backgroundColor: statusFilter === option.value ? colors.accent : colors.secondaryBackground },
-            ]}>
-            <Text style={[typography.footnote, { color: statusFilter === option.value ? '#FFFFFF' : colors.label }]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
       <View style={[styles.controlRow, { marginTop: spacing.md }]}>

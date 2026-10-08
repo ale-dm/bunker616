@@ -30,7 +30,7 @@ import { getFavoriteIds } from './favorites';
 import { CustomListsModal } from './components/CustomListsModal';
 import { CustomList, getCustomLists } from './customLists';
 import { useGridColumns } from '@shared/utils/useGridColumns';
-import { EmptyState } from '@shared/components';
+import { Chip, EmptyState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
 import { SeriesGridItem } from './components/SeriesGridItem';
@@ -282,24 +282,14 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
               ESTADO
             </Text>
             <View style={styles.statusWrap}>
-              {STATUS_OPTIONS.map(option => {
-                const active = draftStatus === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.label}
-                    onPress={() => setDraftStatus(option.value)}
-                    style={[
-                      styles.chip,
-                      {
-                        borderRadius: radii.pill,
-                        backgroundColor: active ? colors.accent : colors.background,
-                        marginBottom: spacing.sm,
-                      },
-                    ]}>
-                    <Text style={{ color: active ? '#FFFFFF' : colors.label, fontSize: 13 }}>{option.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {STATUS_OPTIONS.map(option => (
+                <Chip
+                  key={option.label}
+                  label={option.label}
+                  active={draftStatus === option.value}
+                  onPress={() => setDraftStatus(option.value)}
+                />
+              ))}
             </View>
 
             <View style={[styles.filtersActions, { marginTop: spacing.md }]}>
@@ -324,28 +314,9 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           contentContainerStyle={{ paddingHorizontal: spacing.lg }}
           data={[{ id: undefined, name: 'Todas' }, ...librariesQuery.data]}
           keyExtractor={item => item.id ?? 'all'}
-          renderItem={({ item }) => {
-            const active = libraryId === item.id;
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.chip,
-                  {
-                    borderRadius: radii.pill,
-                    backgroundColor: active ? colors.accent : colors.secondaryBackground,
-                  },
-                ]}
-                onPress={() => setLibraryId(item.id)}>
-                <Text
-                  style={[
-                    typography.subhead,
-                    { color: active ? '#FFFFFF' : colors.label, fontWeight: active ? '600' : '400' },
-                  ]}>
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => (
+            <Chip label={item.name} active={libraryId === item.id} onPress={() => setLibraryId(item.id)} />
+          )}
         />
       )}
 

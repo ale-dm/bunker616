@@ -7,18 +7,18 @@ import { HomeScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import {
   bookThumbnailUrl,
+  buildSeriesSearchQuery,
   getBooksInProgress,
+  getBooksRead,
   getSeries,
   getSeriesById,
-  getBooksRead,
   getSeriesBooks,
   seriesThumbnailUrl,
-  buildSeriesSearchQuery,
 } from '@shared/api/komga';
+import { Chip, CoverImage, EmptyState, MediaRail, SectionHeader } from '@shared/components';
+import { useTheme } from '@shared/theme';
 import { getFavoriteIds } from '@features/library/favorites';
 import { getSeriesLastSeen } from '@features/library/seriesSeen';
-import { CoverImage, EmptyState } from '@shared/components';
-import { useTheme } from '@shared/theme';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
 import { useGridColumns } from '@shared/utils/useGridColumns';
 
@@ -41,6 +41,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const columns = useGridColumns();
+  const queryClient = useQueryClient();
 
   const inProgressQuery = useQuery({
     queryKey: ['home', 'in-progress'],
@@ -55,13 +56,13 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     enabled: !!api,
   });
 
-  const queryClient = useQueryClient();
   const finishedQuery = useQuery({
     queryKey: ['home', 'finished'],
     queryFn: () => getBooksRead(api!, 10),
     enabled: !!api,
     retry: false,
   });
+
   const followedQuery = useQuery({
     queryKey: ['home', 'following'],
     queryFn: async () => {
@@ -115,15 +116,47 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
   const inProgressItems = inProgressQuery.isError ? [] : inProgressQuery.data?.content ?? [];
   const heroItem = inProgressItems[0];
-  const railItems = inProgressItems.slice(1);
   const hasRecent = (recentQuery.data?.content.length ?? 0) > 0;
+  const baseUrl = credentials?.baseUrl ?? '';
 
-  const goToReader = (item: { id: string; seriesId: string; metadata: { title?: string }; name: string }) =>
+  const openReader = (book: { id: string; seriesId: string; metadata: { title?: string }; name: string }) =>
     navigation.navigate('Reader', {
-      bookId: item.id,
-      title: item.metadata.title || item.name,
-      seriesId: item.seriesId,
+      bookId: book.id,
+      title: book.metadata.title || book.name,
+      seriesId: book.seriesId,
     });
+
+  const openSeries = (seriesId: string, title: string) => navigation.navigate('Series', { seriesId, title });
+
+  const continueItems = inProgressItems.slice(1).map(book => ({
+    id: book.id,
+    title: book.metadata.title || book.name,
+    coverUri: bookThumbnailUrl(baseUrl, book.id),
+    onPress: () => openReader(book),
+  }));
+
+  const finishedItems = (finishedQuery.data?.content ?? []).map(book => ({
+    id: book.id,
+    title: book.metadata.title || book.name,
+    coverUri: bookThumbnailUrl(baseUrl, book.id),
+    onPress: () => openSeries(book.seriesId, book.metadata.title || book.name),
+  }));
+
+  const followingItems = (followedQuery.data ?? []).map(({ series, newCount }) => ({
+    id: series.id,
+    title: series.metadata.title || series.name,
+    coverUri: seriesThumbnailUrl(baseUrl, series.id),
+    subtitle: `${newCount} ${newCount === 1 ? 'nuevo' : 'nuevos'}`,
+    subtitleTone: 'progress' as const,
+    onPress: () => openSeries(series.id, series.metadata.title || series.name),
+  }));
+
+  const recommendationItems = (recommendationQuery.data?.series ?? []).map(series => ({
+    id: series.id,
+    title: series.metadata.title || series.name,
+    coverUri: seriesThumbnailUrl(baseUrl, series.id),
+    onPress: () => openSeries(series.id, series.metadata.title || series.name),
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -131,8 +164,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={[styles.headerStripe, { backgroundColor: colors.progress }]} />
         <View style={[styles.headerRow, { paddingHorizontal: spacing.lg }]}>
           <Text style={[typography.largeTitle, styles.headerTitle, { color: colors.label }]}>Inicio</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Search')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={{ fontSize: 22, color: colors.accent }}>⌕</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Search')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.searchButton, { backgroundColor: colors.secondaryBackground, borderRadius: radii.pill }]}>
+            <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Buscar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -140,20 +176,18 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
         {heroItem && (
           <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
-            <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.sm }]}>
-              Sigue leyendo
-            </Text>
+            <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.sm }]}>Sigue leyendo</Text>
             <TouchableOpacity
               style={[
                 styles.heroCard,
                 { backgroundColor: colors.card, borderRadius: radii.lg, borderLeftColor: colors.progress },
               ]}
-              onPress={() => goToReader(heroItem)}>
+              onPress={() => openReader(heroItem)}>
               <View style={[styles.heroCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-                <CoverImage uri={bookThumbnailUrl(credentials!.baseUrl, heroItem.id)} style={styles.heroCoverImage} />
+                <CoverImage uri={bookThumbnailUrl(baseUrl, heroItem.id)} style={styles.heroCoverImage} />
               </View>
               <View style={styles.heroInfo}>
-                <Text style={[typography.footnote, { color: colors.progress, fontWeight: '700' }]}>
+                <Text style={[typography.caption, { color: colors.progress, fontWeight: '700', letterSpacing: 0.5 }]}>
                   CONTINUAR
                 </Text>
                 <Text style={[typography.headline, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
@@ -164,159 +198,21 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     styles.heroButton,
                     { backgroundColor: colors.accent, borderRadius: radii.pill, marginTop: spacing.sm },
                   ]}>
-                  <Text style={[typography.footnote, { color: '#FFFFFF', fontWeight: '700' }]}>
-                    Reanudar ▸
-                  </Text>
+                  <Text style={[typography.footnote, { color: '#FFFFFF', fontWeight: '700' }]}>Reanudar ▸</Text>
                 </View>
               </View>
             </TouchableOpacity>
           </View>
         )}
 
-        {railItems.length > 0 && (
-          <>
-            <Text
-              style={[
-                typography.headline,
-                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-              ]}>
-              Continuar leyendo
-            </Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-              data={railItems}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.continueCard} onPress={() => goToReader(item)}>
-                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-                    <CoverImage uri={bookThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
-                  </View>
-                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
-                    {item.metadata.title || item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </>
+        {continueItems.length > 0 && <MediaRail title="Continuar leyendo" items={continueItems} />}
+        {finishedItems.length > 0 && <MediaRail title="Terminadas recientemente" items={finishedItems} />}
+        {followingItems.length > 0 && <MediaRail title="Siguiendo" subtitle="Series con números nuevos" items={followingItems} />}
+        {recommendationItems.length > 0 && (
+          <MediaRail title={`Porque lees ${recommendationQuery.data?.genre ?? ''}`} items={recommendationItems} />
         )}
 
-        {!!finishedQuery.data?.content.length && (
-          <>
-            <Text
-              style={[
-                typography.headline,
-                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-              ]}>
-              Terminadas recientemente
-            </Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-              data={finishedQuery.data.content}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.continueCard}
-                  onPress={() =>
-                    navigation.navigate('Series', {
-                      seriesId: item.seriesId,
-                      title: item.metadata.title || item.name,
-                    })
-                  }>
-                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-                    <CoverImage uri={bookThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
-                  </View>
-                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
-                    {item.metadata.title || item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </>
-        )}
-
-        {!!recommendationQuery.data && (
-          <>
-            <Text
-              style={[
-                typography.headline,
-                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-              ]}>
-              Porque lees {recommendationQuery.data.genre}
-            </Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-              data={recommendationQuery.data.series}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.continueCard}
-                  onPress={() =>
-                    navigation.navigate('Series', { seriesId: item.id, title: item.metadata.title || item.name })
-                  }>
-                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-                    <CoverImage uri={seriesThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
-                  </View>
-                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
-                    {item.metadata.title || item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </>
-        )}
-
-        {!!followedQuery.data?.length && (
-          <>
-            <Text
-              style={[
-                typography.headline,
-                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-              ]}>
-              Siguiendo
-            </Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-              data={followedQuery.data}
-              keyExtractor={item => item.series.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.continueCard}
-                  onPress={() =>
-                    navigation.navigate('Series', {
-                      seriesId: item.series.id,
-                      title: item.series.metadata.title || item.series.name,
-                    })
-                  }>
-                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-                    <CoverImage uri={seriesThumbnailUrl(credentials!.baseUrl, item.series.id)} style={styles.continueCoverImage} />
-                  </View>
-                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
-                    {item.series.metadata.title || item.series.name}
-                  </Text>
-                  <Text style={[typography.caption, { color: colors.progress, fontWeight: '700' }]}>
-                    {item.newCount} {item.newCount === 1 ? 'nuevo' : 'nuevos'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </>
-        )}
-
-        <Text
-          style={[
-            typography.headline,
-            { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-          ]}>
-          Explorar por género
-        </Text>
+        <SectionHeader title="Explorar por género" />
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -324,21 +220,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           data={GENRE_SHORTCUTS}
           keyExtractor={item => item}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.genreChip, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}
-              onPress={() => navigation.navigate('LibraryTab', { presetGenre: item })}>
-              <Text style={[typography.subhead, { color: colors.label, fontWeight: '600' }]}>{item}</Text>
-            </TouchableOpacity>
+            <Chip label={item} onPress={() => navigation.navigate('LibraryTab', { presetGenre: item })} />
           )}
         />
 
-        <Text
-          style={[
-            typography.headline,
-            { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
-          ]}>
-          Añadidas recientemente
-        </Text>
+        <SectionHeader title="Añadidas recientemente" />
         {hasRecent ? (
           <FlatList
             data={recentQuery.data?.content ?? []}
@@ -351,9 +237,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               <SeriesGridItem
                 series={item}
                 columns={columns}
-                onPress={() =>
-                  navigation.navigate('Series', { seriesId: item.id, title: item.metadata.title || item.name })
-                }
+                onPress={() => openSeries(item.id, item.metadata.title || item.name)}
               />
             )}
           />
@@ -380,18 +264,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: { paddingBottom: 4 },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  searchButton: { paddingHorizontal: 14, paddingVertical: 6, marginBottom: 6 },
   row: { justifyContent: 'space-between' },
-  continueCard: { width: 110, marginRight: 12 },
-  continueCover: { aspectRatio: 2 / 3, overflow: 'hidden' },
-  continueCoverImage: { width: '100%', height: '100%' },
-  heroCard: {
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderLeftWidth: 4,
-  },
+  heroCard: { flexDirection: 'row', overflow: 'hidden', borderLeftWidth: 4 },
   heroCover: { width: 80, aspectRatio: 2 / 3, overflow: 'hidden' },
   heroCoverImage: { width: '100%', height: '100%' },
   heroInfo: { flex: 1, padding: 12, justifyContent: 'center' },
   heroButton: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6 },
-  genreChip: { paddingHorizontal: 16, paddingVertical: 10, marginRight: 10 },
 });

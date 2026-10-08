@@ -43,6 +43,7 @@ import {
   setReaderBackground,
 } from './readerBackground';
 import { PageSource } from './types';
+import { ReaderChip } from './components/ReaderChip';
 import { Bookmark, getBookmarks, toggleBookmark } from './bookmarks';
 import { cachedPagePath, prefetchPages } from './pagePrefetch';
 import {
@@ -53,6 +54,10 @@ import {
   setFitMode,
 } from './readerPrefs';
 import { recordPageTurn } from '@features/history/readingLog';
+
+// Colores del lector: siempre sobre fondo oscuro, así que usan la variante oscura del tema.
+const READER_ACCENT = '#0A84FF';
+const READER_HIGHLIGHT = '#FF9F0A';
 
 const BACKGROUND_LABELS: Record<ReaderBackground, string> = {
   black: 'Negro',
@@ -359,14 +364,6 @@ export function ReaderScreen({ route, navigation }: Props) {
               style={styles.infoButton}>
               <Text style={styles.infoButtonText}>ⓘ</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setIncognito(v => !v)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.chipButton}>
-              <Text style={[styles.chipText, incognito && styles.chipTextActive]}>
-                {incognito ? 'Incógnito ●' : 'Incógnito'}
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowPageGrid(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.pageCounter}>
                 {activeIndex + 1} / {pages.length}
@@ -375,45 +372,26 @@ export function ReaderScreen({ route, navigation }: Props) {
           </View>
 
           <View style={[styles.overlayBottom, { paddingBottom: insets.bottom + 8 }]}>
-            <View style={styles.modeRow}>
-              <TouchableOpacity
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <ReaderChip
+                label={readerMode === 'webtoon' ? 'Webtoon' : 'Paginado'}
+                active={readerMode === 'webtoon'}
                 onPress={() => setReaderMode(m => (m === 'paged' ? 'webtoon' : 'paged'))}
-                style={styles.chipButton}>
-                <Text style={[styles.chipText, readerMode === 'webtoon' && styles.chipTextActive]}>
-                  {readerMode === 'webtoon' ? 'Webtoon' : 'Paginado'}
-                </Text>
-              </TouchableOpacity>
+              />
               {readerMode === 'paged' && (
                 <>
-                  <TouchableOpacity onPress={() => setRtl(v => !v)} style={styles.chipButton}>
-                    <Text style={[styles.chipText, rtl && styles.chipTextActive]}>
-                      {rtl ? 'Manga (RTL)' : 'Occidental'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={onToggleFitMode} style={styles.chipButton}>
-                    <Text style={[styles.chipText, fitMode === 'cover' && styles.chipTextActive]}>
-                      {fitMode === 'cover' ? 'Llenar' : 'Completa'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setDoublePage(v => !v)} style={styles.chipButton}>
-                    <Text style={[styles.chipText, doublePage && styles.chipTextActive]}>
-                      {doublePage ? '2 páginas' : '1 página'}
-                    </Text>
-                  </TouchableOpacity>
+                  <ReaderChip label={rtl ? 'Manga (RTL)' : 'Occidental'} active={rtl} onPress={() => setRtl(v => !v)} />
+                  <ReaderChip label={doublePage ? '2 páginas' : '1 página'} active={doublePage} onPress={() => setDoublePage(v => !v)} />
+                  <ReaderChip label={fitMode === 'cover' ? 'Llenar' : 'Completa'} active={fitMode === 'cover'} onPress={onToggleFitMode} />
                 </>
               )}
-              <TouchableOpacity onPress={onToggleBookmark} style={styles.chipButton}>
-                <Text style={[styles.chipText, isBookmarked && styles.chipTextActive]}>
-                  {isBookmarked ? '★ Marcada' : '☆ Marcar'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={savePage} disabled={saving} style={styles.chipButton}>
-                <Text style={styles.chipText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={cycleBackground} style={styles.chipButton}>
-                <Text style={styles.chipText}>Fondo: {BACKGROUND_LABELS[background]}</Text>
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <ReaderChip label={isBookmarked ? '★ Marcada' : '☆ Marcar'} active={isBookmarked} onPress={onToggleBookmark} />
+              <ReaderChip label={saving ? 'Guardando…' : 'Guardar página'} onPress={savePage} />
+              <ReaderChip label={`Fondo: ${BACKGROUND_LABELS[background]}`} onPress={cycleBackground} />
+              <ReaderChip label={incognito ? 'Incógnito ●' : 'Incógnito'} active={incognito} onPress={() => setIncognito(v => !v)} />
+            </ScrollView>
             <View style={styles.brightnessRow}>
               <Text style={styles.brightnessLabel}>Brillo</Text>
               {DIM_LEVELS.map((level, index) => (
@@ -556,9 +534,6 @@ const styles = StyleSheet.create({
   backButton: { color: '#fff', fontSize: 16, marginRight: 12 },
   overlayTitle: { color: '#fff', fontSize: 14, flex: 1 },
   pageCounter: { color: '#c7c7d1', fontSize: 13, marginLeft: 12 },
-  chipButton: { paddingHorizontal: 8 },
-  chipText: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#FF9500' },
   infoButton: { paddingHorizontal: 8 },
   infoButtonText: { color: '#fff', fontSize: 18 },
   infoBackdrop: {
@@ -582,18 +557,18 @@ const styles = StyleSheet.create({
   offlineText: { color: '#9b9ba1', fontSize: 13, marginBottom: 12 },
   bookmarkList: { maxHeight: 120, marginBottom: 12 },
   bookmarkItem: { paddingVertical: 8 },
-  bookmarkText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
+  bookmarkText: { color: READER_HIGHLIGHT, fontSize: 14, fontWeight: '600' },
   offlineButton: {
     borderWidth: 1,
-    borderColor: '#5865f2',
+    borderColor: READER_ACCENT,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     marginBottom: 12,
   },
-  offlineButtonText: { color: '#5865f2', fontWeight: '600' },
+  offlineButtonText: { color: READER_ACCENT, fontWeight: '600' },
   infoCloseButton: {
-    backgroundColor: '#5865f2',
+    backgroundColor: READER_ACCENT,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -608,18 +583,14 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },
-  modeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  chipScroll: { marginBottom: 6, flexGrow: 0 },
   progressTrack: {
     height: 3,
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 2,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', backgroundColor: '#5865f2' },
+  progressFill: { height: '100%', backgroundColor: READER_ACCENT },
   timeLeft: { color: '#c7c7d1', fontSize: 11, marginTop: 4, marginBottom: 6 },
   dimOverlay: {
     position: 'absolute',
@@ -639,7 +610,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    borderColor: '#5865f2',
+    borderColor: READER_ACCENT,
     marginRight: 8,
   },
   gridContainer: { flex: 1, backgroundColor: '#000' },
@@ -651,7 +622,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   gridTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  gridCloseText: { color: '#5865f2', fontSize: 15, fontWeight: '600' },
+  gridCloseText: { color: READER_ACCENT, fontSize: 15, fontWeight: '600' },
   gridList: { paddingHorizontal: 8, paddingBottom: 24 },
   gridItem: { width: '25%', padding: 6 },
   gridItemActive: { opacity: 0.6 },
@@ -674,12 +645,12 @@ const styles = StyleSheet.create({
   nextCover: { width: 70, aspectRatio: 2 / 3, borderRadius: 6, overflow: 'hidden' },
   nextCoverImage: { width: '100%', height: '100%' },
   nextInfo: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  nextLabel: { color: '#FF9F0A', fontSize: 11, fontWeight: '700' },
+  nextLabel: { color: READER_HIGHLIGHT, fontSize: 11, fontWeight: '700' },
   nextTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 2 },
   nextButton: {
     alignSelf: 'flex-start',
     marginTop: 8,
-    backgroundColor: '#5865f2',
+    backgroundColor: READER_ACCENT,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 6,
