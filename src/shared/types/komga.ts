@@ -4,6 +4,10 @@ export interface ServerCredentials {
   password: string;
 }
 
+export interface ServerProfile extends ServerCredentials {
+  id: string;
+}
+
 export interface Page<T> {
   content: T[];
   totalPages: number;
@@ -26,6 +30,11 @@ export interface ReadProgress {
   readDate?: string;
 }
 
+export interface Author {
+  name: string;
+  role: string;
+}
+
 export interface Series {
   id: string;
   libraryId: string;
@@ -38,6 +47,10 @@ export interface Series {
     title: string;
     summary?: string;
     status?: string;
+    genres?: string[];
+    publisher?: string;
+    ageRating?: number | null;
+    language?: string;
   };
 }
 
@@ -62,8 +75,24 @@ export interface Book {
   metadata: {
     title: string;
     number: string;
+    summary?: string;
+    authors?: Author[];
   };
   readProgress?: ReadProgress;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  ordered: boolean;
+  seriesIds: string[];
+}
+
+export interface ReadList {
+  id: string;
+  name: string;
+  ordered: boolean;
+  bookIds: string[];
 }
 
 export interface UserInfo {

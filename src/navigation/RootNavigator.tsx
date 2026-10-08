@@ -5,9 +5,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@features/auth/AuthContext';
 import { LoginScreen } from '@features/auth/LoginScreen';
+import { HomeScreen } from '@features/home/HomeScreen';
 import { LibraryScreen } from '@features/library/LibraryScreen';
 import { SeriesScreen } from '@features/series/SeriesScreen';
 import { ReaderScreen } from '@features/reader/ReaderScreen';
+import { CollectionScreen } from '@features/collections/CollectionScreen';
+import { ReadListScreen } from '@features/collections/ReadListScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { useTheme } from '@shared/theme';
 import { RootStackParamList, TabParamList } from './types';
@@ -27,6 +30,14 @@ function Tabs() {
         tabBarStyle: { backgroundColor: colors.secondaryBackground, borderTopColor: colors.separator },
         tabBarLabelStyle: typography.caption,
       }}>
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeScreen}
+        options={{
+          title: 'Inicio',
+          tabBarIcon: ({ color }) => <TabGlyph symbol="⌂" color={color} />,
+        }}
+      />
       <Tab.Screen
         name="LibraryTab"
         component={LibraryScreen}
@@ -83,7 +94,12 @@ export function RootNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Tabs" component={Tabs} />
           <Stack.Screen name="Series" component={SeriesScreen} />
+          <Stack.Screen name="Collection" component={CollectionScreen} />
+          <Stack.Screen name="ReadList" component={ReadListScreen} />
           <Stack.Screen name="Reader" component={ReaderScreen} />
+          <Stack.Screen name="AddServer" options={{ presentation: 'modal' }}>
+            {({ navigation }) => <LoginScreen onSuccess={() => navigation.goBack()} />}
+          </Stack.Screen>
         </Stack.Navigator>
       )}
     </NavigationContainer>
