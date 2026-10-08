@@ -4,7 +4,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type TabParamList = {
   HomeTab: undefined;
-  LibraryTab: undefined;
+  // presetGenre permite que Home (u otra pantalla) abra la Biblioteca con
+  // un género ya filtrado, imitando los accesos rápidos de Marvel Unlimited.
+  LibraryTab: { presetGenre?: string } | undefined;
   SettingsTab: undefined;
 };
 

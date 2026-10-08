@@ -51,7 +51,7 @@ const STATUS_OPTIONS: { value: SeriesSearchFilters['status']; label: string }[] 
   { value: 'abandoned', label: 'Abandonada' },
 ];
 
-export function LibraryScreen({ navigation }: LibraryScreenProps) {
+export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const { api } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
@@ -74,6 +74,14 @@ export function LibraryScreen({ navigation }: LibraryScreenProps) {
   const [draftAuthor, setDraftAuthor] = useState('');
   const [draftGenre, setDraftGenre] = useState('');
   const [draftStatus, setDraftStatus] = useState<SeriesSearchFilters['status']>(undefined);
+
+  const presetGenre = route.params?.presetGenre;
+  useEffect(() => {
+    if (presetGenre) {
+      setGenre(presetGenre);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetGenre]);
 
   const hasActiveFilters = !!author || !!genre || !!status;
 
