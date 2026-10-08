@@ -11,6 +11,8 @@ import {
 } from '@features/reader/readingDirection';
 import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
 import { getReadStats, ReadStats } from '@features/history/readingLog';
+import { getNightDimmingEnabled, setNightDimmingEnabled } from '@features/reader/readerPrefs';
+import { exportBackup } from './backup';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { ThemePreference, useTheme } from '@shared/theme';
 
@@ -54,9 +56,25 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const [readStats, setReadStats] = useState<ReadStats | null>(null);
+  const [nightDimming, setNightDimming] = useState(false);
   useEffect(() => {
     getReadStats().then(setReadStats);
+    getNightDimmingEnabled().then(setNightDimming);
   }, []);
+
+  const onToggleNightDimming = (value: boolean) => {
+    setNightDimming(value);
+    setNightDimmingEnabled(value);
+  };
+
+  const onExportBackup = async () => {
+    try {
+      const fileName = await exportBackup();
+      Alert.alert('Copia guardada', `Se ha guardado ${fileName} en la carpeta Descargas.`);
+    } catch (error) {
+      Alert.alert('No se pudo exportar', error instanceof Error ? error.message : 'Error desconocido');
+    }
+  };
   const offlineRecords = useOfflineRecords();
   const offlineBytes = offlineRecords.reduce((sum, record) => sum + record.bytes, 0);
 
@@ -209,6 +227,25 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             </>
           ) : null}
         </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          MODO NOCTURNO
+        </Text>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1, marginRight: spacing.sm }]}>
+            Atenuar el lector de 22:00 a 07:00
+          </Text>
+          <Switch value={nightDimming} onValueChange={onToggleNightDimming} />
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          COPIA DE SEGURIDAD
+        </Text>
+        <TouchableOpacity
+          onPress={onExportBackup}
+          style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Exportar copia a Descargas</Text>
+        </TouchableOpacity>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
           DESCARGAS · {formatBytes(offlineBytes)}

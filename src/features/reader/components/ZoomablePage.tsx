@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { PageSource } from '../types';
+import { FitMode } from '../readerPrefs';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const MAX_SCALE = 4;
@@ -23,6 +24,7 @@ interface Props {
   height?: number;
   xOffset?: number;
   backgroundColor?: string;
+  fitMode?: FitMode;
 }
 
 function clampTranslation(
@@ -42,6 +44,7 @@ export function ZoomablePage({
   height = SCREEN_H,
   xOffset = 0,
   backgroundColor = '#000000',
+  fitMode = 'contain',
 }: Props) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -120,7 +123,7 @@ export function ZoomablePage({
         <Animated.Image
           source={source}
           style={[styles.image, { width, height }, animatedStyle]}
-          resizeMode="contain"
+          resizeMode={fitMode}
         />
       </Animated.View>
     </GestureDetector>

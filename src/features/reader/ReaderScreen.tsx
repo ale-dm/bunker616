@@ -44,6 +44,14 @@ import {
 } from './readerBackground';
 import { PageSource } from './types';
 import { Bookmark, getBookmarks, toggleBookmark } from './bookmarks';
+import { cachedPagePath, prefetchPages } from './pagePrefetch';
+import {
+  FitMode,
+  getFitMode,
+  getNightDimmingEnabled,
+  isNightHour,
+  setFitMode,
+} from './readerPrefs';
 import { recordPageTurn } from '@features/history/readingLog';
 
 const BACKGROUND_LABELS: Record<ReaderBackground, string> = {
@@ -78,6 +86,10 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [background, setBackground] = useState<ReaderBackground>('black');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [fitMode, setFitModeState] = useState<FitMode>('contain');
+  const [, setPrefetchTick] = useState(0);
+  const sessionStartRef = useRef(Date.now());
+  const sessionTurnsRef = useRef(0);
   const { record, progress } = useOfflineBook(bookId);
 
   useEffect(() => {
@@ -90,7 +102,14 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     getBookmarks(bookId).then(setBookmarks);
+    getFitMode().then(setFitModeState);
+    getNightDimmingEnabled().then(enabled => {
+      if (enabled && isNightHour()) {
+        setDimIndex(2);
+      }
+    });
   }, [bookId]);
+
 
   const cycleBackground = () => {
     const next = nextReaderBackground(background);
@@ -122,6 +141,24 @@ export function ReaderScreen({ route, navigation }: Props) {
     return Math.min(Math.max(progressInfo.page - 1, 0), pages.length - 1);
   }, [bookQuery.data, pages.length]);
 
+  const currentIndex = activePageIndex ?? initialIndex;
+  const credentialsBaseUrl = credentials?.baseUrl;
+  useEffect(() => {
+    if (record || !credentials || pages.length === 0) {
+      return;
+    }
+    prefetchPages({
+      baseUrl: credentials.baseUrl,
+      authHeader: getAuthHeader(credentials),
+      bookId,
+      pages,
+      fromIndex: currentIndex + 1,
+      count: 3,
+      onReady: () => setPrefetchTick(tick => tick + 1),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, pages.length, record, credentialsBaseUrl, bookId]);
+
   const isAtEnd = pages.length > 0 && (activePageIndex ?? initialIndex) === pages.length - 1;
   const seriesBooksQuery = useQuery({
     queryKey: ['series', seriesId, 'books', 'reader'],
@@ -150,10 +187,28 @@ export function ReaderScreen({ route, navigation }: Props) {
   const handlePageIndexChange = (pageIndex: number) => {
     if (!incognito && pageIndex !== activeIndex) {
       recordPageTurn();
+      sessionTurnsRef.current += 1;
       reportPage(pageIndex);
     }
     setActivePageIndex(pageIndex);
   };
+
+  const onToggleFitMode = () => {
+    const next: FitMode = fitMode === 'contain' ? 'cover' : 'contain';
+    setFitModeState(next);
+    setFitMode(next);
+  };
+
+  const pagesLeft = pages.length - activeIndex - 1;
+  const minutesElapsed = (Date.now() - sessionStartRef.current) / 60000;
+  const pagesPerMinute =
+    minutesElapsed >= 2 && sessionTurnsRef.current >= 3 ? sessionTurnsRef.current / minutesElapsed : null;
+  const timeLeftLabel =
+    pagesLeft <= 0
+      ? 'Última página'
+      : pagesPerMinute
+        ? `~${Math.ceil(pagesLeft / pagesPerMinute)} min restantes`
+        : `${pagesLeft} páginas restantes`;
 
   const isBookmarked = bookmarks.some(bookmark => bookmark.pageIndex === activeIndex);
 
@@ -170,13 +225,19 @@ export function ReaderScreen({ route, navigation }: Props) {
     }
   };
 
-  const getPageSource = (page: BookPage): PageSource =>
-    record
-      ? { uri: localPageUri(bookId, page) }
-      : {
-          uri: bookPageUrl(credentials.baseUrl, bookId, page.number),
-          headers: { Authorization: authHeader },
-        };
+  const getPageSource = (page: BookPage): PageSource => {
+    if (record) {
+      return { uri: localPageUri(bookId, page) };
+    }
+    const prefetched = cachedPagePath(bookId, page);
+    if (prefetched) {
+      return { uri: `file://${prefetched}` };
+    }
+    return {
+      uri: bookPageUrl(credentials.baseUrl, bookId, page.number),
+      headers: { Authorization: authHeader },
+    };
+  };
 
   const savePage = async () => {
     const page = pages[activeIndex];
@@ -234,6 +295,7 @@ export function ReaderScreen({ route, navigation }: Props) {
           rtl={rtl}
           doublePage={doublePage}
           backgroundColor={backgroundColor}
+          fitMode={fitMode}
           initialPageIndex={initialIndex}
           onPageIndexChange={handlePageIndexChange}
           onTapCenter={() => setShowOverlay(v => !v)}
@@ -328,6 +390,11 @@ export function ReaderScreen({ route, navigation }: Props) {
                       {rtl ? 'Manga (RTL)' : 'Occidental'}
                     </Text>
                   </TouchableOpacity>
+                  <TouchableOpacity onPress={onToggleFitMode} style={styles.chipButton}>
+                    <Text style={[styles.chipText, fitMode === 'cover' && styles.chipTextActive]}>
+                      {fitMode === 'cover' ? 'Llenar' : 'Completa'}
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setDoublePage(v => !v)} style={styles.chipButton}>
                     <Text style={[styles.chipText, doublePage && styles.chipTextActive]}>
                       {doublePage ? '2 páginas' : '1 página'}
@@ -367,6 +434,7 @@ export function ReaderScreen({ route, navigation }: Props) {
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
             </View>
+            <Text style={styles.timeLeft}>{timeLeftLabel}</Text>
           </View>
         </>
       )}
@@ -552,6 +620,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: '#5865f2' },
+  timeLeft: { color: '#c7c7d1', fontSize: 11, marginTop: 4, marginBottom: 6 },
   dimOverlay: {
     position: 'absolute',
     top: 0,

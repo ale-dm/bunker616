@@ -10,6 +10,7 @@ import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view
 import { BookPage } from '@shared/types/komga';
 import { buildPageGroups, findGroupIndex } from '../pageGroups';
 import { PageSource } from '../types';
+import { FitMode } from '../readerPrefs';
 import { ZoomablePage } from './ZoomablePage';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -24,13 +25,14 @@ interface Props {
   rtl: boolean;
   doublePage: boolean;
   backgroundColor: string;
+  fitMode: FitMode;
   initialPageIndex: number;
   onPageIndexChange: (pageIndex: number) => void;
   onTapCenter: () => void;
 }
 
 export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReaderImpl(
-  { pages, getPageSource, rtl, doublePage, backgroundColor, initialPageIndex, onPageIndexChange, onTapCenter },
+  { pages, getPageSource, rtl, doublePage, backgroundColor, fitMode, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
   const pagerRef = useRef<PagerView>(null);
@@ -111,7 +113,12 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
           const page = pages[group[0]];
           return (
             <View key={key} collapsable={false}>
-              <ZoomablePage source={getPageSource(page)} onTap={handleTap} backgroundColor={backgroundColor} />
+              <ZoomablePage
+                source={getPageSource(page)}
+                onTap={handleTap}
+                backgroundColor={backgroundColor}
+                fitMode={fitMode}
+              />
             </View>
           );
         }
@@ -127,6 +134,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
                   source={getPageSource(page)}
                   onTap={handleTap}
                   backgroundColor={backgroundColor}
+                  fitMode={fitMode}
                   width={half}
                   xOffset={slot * half}
                 />

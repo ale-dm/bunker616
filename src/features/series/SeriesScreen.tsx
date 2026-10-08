@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
@@ -9,6 +20,8 @@ import { getBookPages, getSeriesBooks, getSeriesById, seriesThumbnailUrl, update
 import { getAuthHeader } from '@shared/api/client';
 import { downloadBook, getOfflineRecords } from '@features/offline/offlineStore';
 import { markSeriesSeen } from '@features/library/seriesSeen';
+import { getSeriesNote, setSeriesNote } from './seriesNotes';
+import { CustomListsModal } from '@features/library/components/CustomListsModal';
 import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
 import { CoverImage } from '@shared/components';
 import { useTheme } from '@shared/theme';
@@ -45,6 +58,8 @@ export function SeriesScreen({ route, navigation }: Props) {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [sortMode, setSortMode] = useState<'number' | 'date'>('number');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'inProgress' | 'read'>('all');
+  const [note, setNote] = useState('');
+  const [showLists, setShowLists] = useState(false);
   const [seriesDownload, setSeriesDownload] = useState<{ done: number; total: number } | null>(null);
   const cancelDownloadRef = useRef(false);
 
@@ -55,6 +70,23 @@ export function SeriesScreen({ route, navigation }: Props) {
   useEffect(() => () => {
     markSeriesSeen(seriesId);
   }, [seriesId]);
+
+  const noteRef = useRef('');
+  useEffect(() => {
+    getSeriesNote(seriesId).then(saved => {
+      noteRef.current = saved;
+      setNote(saved);
+    });
+    return () => {
+      setSeriesNote(seriesId, noteRef.current);
+    };
+  }, [seriesId]);
+
+  const onShare = () => {
+    const name = seriesQuery.data?.metadata.title || title;
+    const summary = seriesQuery.data?.metadata.summary;
+    Share.share({ title: name, message: summary ? `${name}\n\n${summary}` : name }).catch(() => undefined);
+  };
 
   const onToggleFavorite = async () => {
     const ids = await toggleFavorite(seriesId);
@@ -157,6 +189,9 @@ export function SeriesScreen({ route, navigation }: Props) {
             <Text style={[typography.title, { color: colors.label, flex: 1 }]} numberOfLines={3}>
               {metadata?.title || title}
             </Text>
+            <TouchableOpacity onPress={onShare} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: spacing.sm }}>
+              <Text style={{ fontSize: 20, color: colors.accent }}>⇪</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={onToggleFavorite}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -208,6 +243,26 @@ export function SeriesScreen({ route, navigation }: Props) {
         </TouchableOpacity>
       )}
 
+      <View style={{ marginTop: spacing.lg }}>
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs }]}>NOTAS</Text>
+        <TextInput
+          multiline
+          value={note}
+          onChangeText={text => {
+            noteRef.current = text;
+            setNote(text);
+          }}
+          onBlur={() => setSeriesNote(seriesId, noteRef.current)}
+          placeholder="Escribe una nota sobre esta serie…"
+          placeholderTextColor={colors.tertiaryLabel}
+          style={[
+            typography.body,
+            styles.noteInput,
+            { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, color: colors.label },
+          ]}
+        />
+      </View>
+
       <View style={[styles.controlRow, { marginTop: spacing.lg }]}>
         {SORT_OPTIONS.map(option => (
           <TouchableOpacity
@@ -239,6 +294,11 @@ export function SeriesScreen({ route, navigation }: Props) {
         ))}
       </View>
       <View style={[styles.controlRow, { marginTop: spacing.md }]}>
+        <TouchableOpacity
+          onPress={() => setShowLists(true)}
+          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
+          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Añadir a lista</Text>
+        </TouchableOpacity>
         {seriesDownload ? (
           <TouchableOpacity
             onPress={() => {
@@ -306,6 +366,7 @@ export function SeriesScreen({ route, navigation }: Props) {
           )}
         />
       )}
+      <CustomListsModal visible={showLists} onClose={() => setShowLists(false)} seriesId={seriesId} />
     </View>
   );
 }
@@ -321,5 +382,6 @@ const styles = StyleSheet.create({
   genreWrap: { flexDirection: 'row', flexWrap: 'wrap' },
   genreChip: { paddingHorizontal: 10, paddingVertical: 4, marginRight: 6, marginBottom: 6 },
   controlRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  noteInput: { minHeight: 70, padding: 12, textAlignVertical: 'top' },
   controlChip: { paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, marginBottom: 4 },
 });

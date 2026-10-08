@@ -130,6 +130,13 @@ export async function getBooksInProgress(api: AxiosInstance, size = 10): Promise
   return data;
 }
 
+export async function getBooksRead(api: AxiosInstance, size = 10): Promise<Page<Book>> {
+  const { data } = await api.get<Page<Book>>('/api/v1/books', {
+    params: { read_status: 'READ', sort: 'readProgress.readDate,desc', size },
+  });
+  return data;
+}
+
 export async function searchBooks(api: AxiosInstance, term: string, size = 20): Promise<Page<Book>> {
   const { data } = await api.get<Page<Book>>('/api/v1/books', { params: { search: term, size } });
   return data;

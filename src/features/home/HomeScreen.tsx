@@ -10,6 +10,7 @@ import {
   getBooksInProgress,
   getSeries,
   getSeriesById,
+  getBooksRead,
   getSeriesBooks,
   seriesThumbnailUrl,
   buildSeriesSearchQuery,
@@ -55,6 +56,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   });
 
   const queryClient = useQueryClient();
+  const finishedQuery = useQuery({
+    queryKey: ['home', 'finished'],
+    queryFn: () => getBooksRead(api!, 10),
+    enabled: !!api,
+    retry: false,
+  });
   const followedQuery = useQuery({
     queryKey: ['home', 'following'],
     queryFn: async () => {
@@ -183,6 +190,42 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.continueCard} onPress={() => goToReader(item)}>
+                  <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
+                    <CoverImage uri={bookThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
+                  </View>
+                  <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
+                    {item.metadata.title || item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </>
+        )}
+
+        {!!finishedQuery.data?.content.length && (
+          <>
+            <Text
+              style={[
+                typography.headline,
+                { color: colors.label, paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.sm },
+              ]}>
+              Terminadas recientemente
+            </Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+              data={finishedQuery.data.content}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.continueCard}
+                  onPress={() =>
+                    navigation.navigate('Series', {
+                      seriesId: item.seriesId,
+                      title: item.metadata.title || item.name,
+                    })
+                  }>
                   <View style={[styles.continueCover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
                     <CoverImage uri={bookThumbnailUrl(credentials!.baseUrl, item.id)} style={styles.continueCoverImage} />
                   </View>
