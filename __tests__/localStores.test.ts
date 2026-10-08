@@ -105,3 +105,22 @@ describe('reader presets', () => {
     expect(otherSeries.doublePage).toBe(false);
   });
 });
+
+describe('nextBooks', () => {
+  const { nextBooks } = require('../src/shared/utils/stackedBooks');
+  const book = (id: string, completed = false) => ({ id, readProgress: completed ? { completed: true } : undefined });
+
+  it('returns the books after a given book', () => {
+    const books = [book('1'), book('2'), book('3'), book('4')];
+    expect(nextBooks(books, '2').map((b: { id: string }) => b.id)).toEqual(['3', '4']);
+  });
+
+  it('returns nothing for the last book', () => {
+    expect(nextBooks([book('1'), book('2')], '2')).toEqual([]);
+  });
+
+  it('starts after the first unread book when no book is given', () => {
+    const books = [book('1', true), book('2', true), book('3'), book('4'), book('5')];
+    expect(nextBooks(books).map((b: { id: string }) => b.id)).toEqual(['4', '5']);
+  });
+});

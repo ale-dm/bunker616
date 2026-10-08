@@ -10,6 +10,7 @@ export interface RailItem {
   coverUri: string;
   subtitle?: string;
   subtitleTone?: 'secondary' | 'progress';
+  stack?: { seriesId: string; fromBookId?: string };
   onPress: () => void;
 }
 
@@ -36,6 +37,7 @@ export function MediaRail({ title, subtitle, items }: Props) {
             title={item.title}
             subtitle={item.subtitle}
             subtitleTone={item.subtitleTone}
+            stack={item.stack}
             onPress={item.onPress}
           />
         )}

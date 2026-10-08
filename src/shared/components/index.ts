@@ -6,3 +6,4 @@ export * from './Chip';
 export * from './MediaCard';
 export * from './MediaRail';
 export * from './SegmentedControl';
+export * from './StackedCover';

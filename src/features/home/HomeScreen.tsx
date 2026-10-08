@@ -135,6 +135,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     id: book.id,
     title: book.metadata.title || book.name,
     coverUri: bookThumbnailUrl(baseUrl, book.id),
+    stack: { seriesId: book.seriesId, fromBookId: book.id },
     onPress: () => openReader(book),
   }));
 
@@ -151,6 +152,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     coverUri: seriesCoverUri(baseUrl, series.id),
     subtitle: `${newCount} ${newCount === 1 ? 'nuevo' : 'nuevos'}`,
     subtitleTone: 'progress' as const,
+    stack: { seriesId: series.id },
     onPress: () => openSeries(series.id, series.metadata.title || series.name),
   }));
 
@@ -158,6 +160,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     id: series.id,
     title: series.metadata.title || series.name,
     coverUri: seriesCoverUri(baseUrl, series.id),
+    stack: { seriesId: series.id },
     onPress: () => openSeries(series.id, series.metadata.title || series.name),
   }));
 

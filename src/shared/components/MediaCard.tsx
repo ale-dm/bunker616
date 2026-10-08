@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CoverImage } from './CoverImage';
+import { StackedCover } from './StackedCover';
 import { useTheme } from '@shared/theme';
 
 interface Props {
@@ -9,16 +10,25 @@ interface Props {
   subtitle?: string;
   subtitleTone?: 'secondary' | 'progress';
   width?: number;
+  stack?: { seriesId: string; fromBookId?: string };
   onPress: () => void;
 }
 
-export function MediaCard({ coverUri, title, subtitle, subtitleTone = 'secondary', width = 110, onPress }: Props) {
+export function MediaCard({ coverUri, title, subtitle, subtitleTone = 'secondary', width = 110, stack, onPress }: Props) {
   const { colors, radii, spacing, typography } = useTheme();
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.card, { width }]}>
-      <View style={[styles.cover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
-        <CoverImage uri={coverUri} style={styles.coverImage} />
-      </View>
+      {stack ? (
+        <StackedCover seriesId={stack.seriesId} fromBookId={stack.fromBookId} width={width}>
+          <View style={[styles.cover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
+            <CoverImage uri={coverUri} style={styles.coverImage} />
+          </View>
+        </StackedCover>
+      ) : (
+        <View style={[styles.cover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>
+          <CoverImage uri={coverUri} style={styles.coverImage} />
+        </View>
+      )}
       <Text style={[typography.footnote, { color: colors.label, marginTop: spacing.xs }]} numberOfLines={2}>
         {title}
       </Text>
