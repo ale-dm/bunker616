@@ -12,18 +12,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getAuthHeader } from '@shared/api/client';
 import { getBook, getBookPages, bookPageUrl } from '@shared/api/komga';
-import { ZoomablePage } from './components/ZoomablePage';
+import { PagedReader, PagedReaderRef } from './components/PagedReader';
+import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
 import { getDefaultReadingDirection } from './readingDirection';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reader'>;
+type ReaderMode = 'paged' | 'webtoon';
 
 // No hay un slider real (evita añadir una nueva dependencia nativa solo
 // para esto): se simula el brillo atenuando la pantalla con una capa negra.
@@ -33,15 +34,18 @@ export function ReaderScreen({ route, navigation }: Props) {
   const { bookId, title } = route.params;
   const { api, credentials } = useAuth();
   const insets = useSafeAreaInsets();
-  const pagerRef = useRef<PagerView>(null);
+  const pagedRef = useRef<PagedReaderRef>(null);
+  const webtoonRef = useRef<WebtoonReaderRef>(null);
   const [showOverlay, setShowOverlay] = useState(true);
-  const [currentPosition, setCurrentPosition] = useState<number | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState<number | null>(null);
   const [dimIndex, setDimIndex] = useState(0);
   const [incognito, setIncognito] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showPageGrid, setShowPageGrid] = useState(false);
   const [rtl, setRtl] = useState(false);
   const [rtlLoaded, setRtlLoaded] = useState(false);
+  const [doublePage, setDoublePage] = useState(false);
+  const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
 
   useEffect(() => {
     getDefaultReadingDirection().then(direction => {
@@ -65,12 +69,6 @@ export function ReaderScreen({ route, navigation }: Props) {
   const pages = pagesQuery.data ?? [];
   const { reportPage } = useReaderProgress(api, bookId, pages.length);
 
-  // En RTL, la posición del PagerView (orden visual/físico) y el número de
-  // página "de lectura" van en orden inverso. Esta función es su propia
-  // inversa: sirve para convertir en ambos sentidos.
-  const toPagerPosition = (readingIndex: number) =>
-    rtl ? pages.length - 1 - readingIndex : readingIndex;
-
   const initialIndex = useMemo(() => {
     const progress = bookQuery.data?.readProgress;
     if (!progress || progress.completed || pages.length === 0) {
@@ -87,64 +85,54 @@ export function ReaderScreen({ route, navigation }: Props) {
     );
   }
 
-  const activeIndex = currentPosition !== null ? toPagerPosition(currentPosition) : initialIndex;
+  const activeIndex = activePageIndex ?? initialIndex;
   const authHeader = getAuthHeader(credentials);
   const progressRatio = pages.length > 0 ? (activeIndex + 1) / pages.length : 0;
-  const displayPages = rtl ? [...pages].reverse() : pages;
 
-  const goToReadingIndex = (readingIndex: number) => {
-    if (readingIndex < 0 || readingIndex >= pages.length) {
-      return;
+  const handlePageIndexChange = (pageIndex: number) => {
+    setActivePageIndex(pageIndex);
+    if (!incognito) {
+      reportPage(pageIndex);
     }
-    pagerRef.current?.setPage(toPagerPosition(readingIndex));
   };
 
-  const handleToggleRtl = () => {
-    const newRtl = !rtl;
-    const newPosition = newRtl ? pages.length - 1 - activeIndex : activeIndex;
-    setRtl(newRtl);
-    // displayPages cambia de orden al re-renderizar; hay que decirle al
-    // PagerView en qué posición física queda ahora esa misma página.
-    requestAnimationFrame(() => {
-      pagerRef.current?.setPageWithoutAnimation(newPosition);
-      setCurrentPosition(newPosition);
-    });
-  };
-
-  const handleTap = (xRatio: number) => {
-    if (xRatio < 0.3) {
-      goToReadingIndex(rtl ? activeIndex + 1 : activeIndex - 1);
-    } else if (xRatio > 0.7) {
-      goToReadingIndex(rtl ? activeIndex - 1 : activeIndex + 1);
+  const goToPage = (pageIndex: number) => {
+    if (readerMode === 'paged') {
+      pagedRef.current?.goToPage(pageIndex);
     } else {
-      setShowOverlay(v => !v);
+      webtoonRef.current?.goToPage(pageIndex);
     }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar hidden={!showOverlay} />
-      <PagerView
-        ref={pagerRef}
-        style={styles.pager}
-        initialPage={toPagerPosition(initialIndex)}
-        onPageSelected={(e: PagerViewOnPageSelectedEvent) => {
-          const position = e.nativeEvent.position;
-          setCurrentPosition(position);
-          if (!incognito) {
-            reportPage(toPagerPosition(position));
-          }
-        }}>
-        {displayPages.map(page => (
-          <View key={page.number} collapsable={false}>
-            <ZoomablePage
-              uri={bookPageUrl(credentials.baseUrl, bookId, page.number)}
-              authHeader={authHeader}
-              onTap={handleTap}
-            />
-          </View>
-        ))}
-      </PagerView>
+
+      {readerMode === 'paged' ? (
+        <PagedReader
+          ref={pagedRef}
+          pages={pages}
+          baseUrl={credentials.baseUrl}
+          bookId={bookId}
+          authHeader={authHeader}
+          rtl={rtl}
+          doublePage={doublePage}
+          initialPageIndex={initialIndex}
+          onPageIndexChange={handlePageIndexChange}
+          onTapCenter={() => setShowOverlay(v => !v)}
+        />
+      ) : (
+        <WebtoonReader
+          ref={webtoonRef}
+          pages={pages}
+          baseUrl={credentials.baseUrl}
+          bookId={bookId}
+          authHeader={authHeader}
+          initialPageIndex={initialIndex}
+          onPageIndexChange={handlePageIndexChange}
+          onTapCenter={() => setShowOverlay(v => !v)}
+        />
+      )}
 
       {DIM_LEVELS[dimIndex] > 0 && (
         <View
@@ -169,18 +157,10 @@ export function ReaderScreen({ route, navigation }: Props) {
               <Text style={styles.infoButtonText}>ⓘ</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleToggleRtl}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.incognitoButton}>
-              <Text style={[styles.incognitoText, rtl && styles.incognitoTextActive]}>
-                {rtl ? 'Manga (RTL)' : 'Occidental'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               onPress={() => setIncognito(v => !v)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.incognitoButton}>
-              <Text style={[styles.incognitoText, incognito && styles.incognitoTextActive]}>
+              style={styles.chipButton}>
+              <Text style={[styles.chipText, incognito && styles.chipTextActive]}>
                 {incognito ? 'Incógnito ●' : 'Incógnito'}
               </Text>
             </TouchableOpacity>
@@ -190,7 +170,31 @@ export function ReaderScreen({ route, navigation }: Props) {
               </Text>
             </TouchableOpacity>
           </View>
+
           <View style={[styles.overlayBottom, { paddingBottom: insets.bottom + 8 }]}>
+            <View style={styles.modeRow}>
+              <TouchableOpacity
+                onPress={() => setReaderMode(m => (m === 'paged' ? 'webtoon' : 'paged'))}
+                style={styles.chipButton}>
+                <Text style={[styles.chipText, readerMode === 'webtoon' && styles.chipTextActive]}>
+                  {readerMode === 'webtoon' ? 'Webtoon' : 'Paginado'}
+                </Text>
+              </TouchableOpacity>
+              {readerMode === 'paged' && (
+                <>
+                  <TouchableOpacity onPress={() => setRtl(v => !v)} style={styles.chipButton}>
+                    <Text style={[styles.chipText, rtl && styles.chipTextActive]}>
+                      {rtl ? 'Manga (RTL)' : 'Occidental'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setDoublePage(v => !v)} style={styles.chipButton}>
+                    <Text style={[styles.chipText, doublePage && styles.chipTextActive]}>
+                      {doublePage ? '2 páginas' : '1 página'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
             <View style={styles.brightnessRow}>
               <Text style={styles.brightnessLabel}>Brillo</Text>
               {DIM_LEVELS.map((level, index) => (
@@ -264,7 +268,7 @@ export function ReaderScreen({ route, navigation }: Props) {
                 style={[styles.gridItem, index === activeIndex && styles.gridItemActive]}
                 onPress={() => {
                   setShowPageGrid(false);
-                  goToReadingIndex(index);
+                  goToPage(index);
                 }}>
                 <Image
                   source={{ uri: bookPageUrl(credentials.baseUrl, bookId, page.number), headers: { Authorization: authHeader } }}
@@ -283,7 +287,6 @@ export function ReaderScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  pager: { flex: 1 },
   loaderContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -304,9 +307,9 @@ const styles = StyleSheet.create({
   backButton: { color: '#fff', fontSize: 16, marginRight: 12 },
   overlayTitle: { color: '#fff', fontSize: 14, flex: 1 },
   pageCounter: { color: '#c7c7d1', fontSize: 13, marginLeft: 12 },
-  incognitoButton: { paddingHorizontal: 8 },
-  incognitoText: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
-  incognitoTextActive: { color: '#FF9500' },
+  chipButton: { paddingHorizontal: 8 },
+  chipText: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#FF9500' },
   infoButton: { paddingHorizontal: 8 },
   infoButtonText: { color: '#fff', fontSize: 18 },
   infoBackdrop: {
@@ -342,6 +345,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  modeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   progressTrack: {
     height: 3,

@@ -16,6 +16,12 @@ interface Props {
   uri: string;
   authHeader: string;
   onTap: (xRatio: number) => void;
+  // Para el modo doble página: cada mitad ocupa menos que la pantalla
+  // completa, pero el ratio que se le pasa a onTap sigue siendo relativo a
+  // toda la pantalla (xOffset es dónde empieza esta mitad).
+  width?: number;
+  height?: number;
+  xOffset?: number;
 }
 
 function clampTranslation(
@@ -28,7 +34,14 @@ function clampTranslation(
   return Math.max(-maxOffset, Math.min(maxOffset, value));
 }
 
-export function ZoomablePage({ uri, authHeader, onTap }: Props) {
+export function ZoomablePage({
+  uri,
+  authHeader,
+  onTap,
+  width = SCREEN_W,
+  height = SCREEN_H,
+  xOffset = 0,
+}: Props) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -44,8 +57,8 @@ export function ZoomablePage({ uri, authHeader, onTap }: Props) {
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      translateX.value = clampTranslation(translateX.value, scale.value, SCREEN_W);
-      translateY.value = clampTranslation(translateY.value, scale.value, SCREEN_H);
+      translateX.value = clampTranslation(translateX.value, scale.value, width);
+      translateY.value = clampTranslation(translateY.value, scale.value, height);
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
       runOnJS(setIsZoomed)(scale.value > 1.05);
@@ -57,12 +70,12 @@ export function ZoomablePage({ uri, authHeader, onTap }: Props) {
       translateX.value = clampTranslation(
         savedTranslateX.value + event.translationX,
         scale.value,
-        SCREEN_W,
+        width,
       );
       translateY.value = clampTranslation(
         savedTranslateY.value + event.translationY,
         scale.value,
-        SCREEN_H,
+        height,
       );
     })
     .onEnd(() => {
@@ -86,7 +99,7 @@ export function ZoomablePage({ uri, authHeader, onTap }: Props) {
   const singleTapGesture = Gesture.Tap()
     .numberOfTaps(1)
     .onEnd(event => {
-      runOnJS(onTap)(event.x / SCREEN_W);
+      runOnJS(onTap)((xOffset + event.x) / SCREEN_W);
     });
 
   const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
@@ -102,10 +115,10 @@ export function ZoomablePage({ uri, authHeader, onTap }: Props) {
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={styles.container}>
+      <Animated.View style={[styles.container, { width, height }]}>
         <Animated.Image
           source={{ uri, headers: { Authorization: authHeader } }}
-          style={[styles.image, animatedStyle]}
+          style={[styles.image, { width, height }, animatedStyle]}
           resizeMode="contain"
         />
       </Animated.View>
@@ -115,11 +128,9 @@ export function ZoomablePage({ uri, authHeader, onTap }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    width: SCREEN_W,
-    height: SCREEN_H,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#000',
   },
-  image: { width: SCREEN_W, height: SCREEN_H },
+  image: {},
 });
