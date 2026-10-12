@@ -170,3 +170,48 @@ describe('pending progress queue', () => {
     expect(await getPendingProgress('book-9')).toBeUndefined();
   });
 });
+
+describe('search history', () => {
+  it('keeps the latest term first, without duplicates, capped at ten', async () => {
+    const { addSearchTerm, getSearchHistory } = require('../src/features/search/searchHistory');
+    await addSearchTerm('batman');
+    await addSearchTerm('Akira');
+    await addSearchTerm('BATMAN');
+    expect(await getSearchHistory()).toEqual(['BATMAN', 'Akira']);
+    for (let i = 0; i < 12; i++) {
+      await addSearchTerm(`serie ${i}`);
+    }
+    const history = await getSearchHistory();
+    expect(history).toHaveLength(10);
+    expect(history[0]).toBe('serie 11');
+  });
+
+  it('ignores blank terms', async () => {
+    const { addSearchTerm, getSearchHistory } = require('../src/features/search/searchHistory');
+    await addSearchTerm('   ');
+    expect(await getSearchHistory()).toEqual([]);
+  });
+});
+
+describe('saved filters', () => {
+  it('names a filter after its parts and keeps it until deleted', async () => {
+    const { saveFilter, deleteSavedFilter, getSavedFilters } = require('../src/features/library/savedFilters');
+    const saved = await saveFilter({ genre: 'Acción', author: 'Sean Murphy' });
+    expect(saved[0].name).toBe('Acción · Sean Murphy');
+    const remaining = await deleteSavedFilter(saved[0].id);
+    expect(remaining).toEqual([]);
+    expect(await getSavedFilters()).toEqual([]);
+  });
+});
+
+describe('reading sessions', () => {
+  it('totals minutes and counts books read on more than one day', async () => {
+    const { recordReadingSession, getSessionStats } = require('../src/features/history/readingLog');
+    await recordReadingSession({ bookId: 'a', durationMs: 5 * 60000, pagesTurned: 10 });
+    await recordReadingSession({ bookId: 'b', durationMs: 3 * 60000, pagesTurned: 4 });
+    const stats = await getSessionStats();
+    expect(stats.sessions).toBe(2);
+    expect(stats.totalMinutes).toBe(8);
+    expect(stats.rereadBooks).toBe(0);
+  });
+});

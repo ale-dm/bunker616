@@ -161,6 +161,20 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
         const half = SCREEN_W / 2;
         return (
           <View key={key} collapsable={false} style={{ flexDirection: 'row' }}>
+            {[12, 6, 2].map((width, layer) => (
+              <View
+                key={`spine-${width}`}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: half - width / 2,
+                  top: 0,
+                  bottom: 0,
+                  width,
+                  backgroundColor: `rgba(0,0,0,${[0.08, 0.18, 0.35][layer]})`,
+                }}
+              />
+            ))}
             {visualOrder.map((slot, index) => {
               const page = pages[slot.pageIndex];
               return (

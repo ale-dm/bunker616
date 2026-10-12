@@ -66,8 +66,8 @@ export function CustomListsModal({ visible, onClose, seriesId, browseListId, onO
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button" style={styles.backdrop} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity accessibilityRole="button"
           activeOpacity={1}
           style={[styles.sheet, { backgroundColor: colors.secondaryBackground, borderRadius: radii.lg }]}>
           <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.md }]}>{title}</Text>
@@ -80,7 +80,7 @@ export function CustomListsModal({ visible, onClose, seriesId, browseListId, onO
                 </Text>
               )}
               {(browseQuery.data ?? []).map(series => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={series.id}
                   style={styles.row}
                   onPress={() => {
@@ -92,7 +92,7 @@ export function CustomListsModal({ visible, onClose, seriesId, browseListId, onO
                   </Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity onPress={() => onDelete(browseList.id)} style={styles.row}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => onDelete(browseList.id)} style={styles.row}>
                 <Text style={[typography.body, { color: colors.danger }]}>Borrar lista</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -106,7 +106,7 @@ export function CustomListsModal({ visible, onClose, seriesId, browseListId, onO
               {lists.map(list => {
                 const checked = !!seriesId && list.seriesIds.includes(seriesId);
                 return (
-                  <TouchableOpacity key={list.id} style={styles.row} onPress={() => onToggle(list.id)}>
+                  <TouchableOpacity accessibilityRole="button" key={list.id} style={styles.row} onPress={() => onToggle(list.id)}>
                     <Text style={[typography.body, { color: colors.label, flex: 1 }]} numberOfLines={1}>
                       {list.name}
                     </Text>
@@ -134,13 +134,13 @@ export function CustomListsModal({ visible, onClose, seriesId, browseListId, onO
                   { backgroundColor: colors.background, borderRadius: radii.md, color: colors.label },
                 ]}
               />
-              <TouchableOpacity onPress={onCreate} style={styles.createButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={onCreate} style={styles.createButton}>
                 <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Crear</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          <TouchableOpacity onPress={onClose} style={[styles.closeButton, { marginTop: spacing.md }]}>
+          <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[styles.closeButton, { marginTop: spacing.md }]}>
             <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Cerrar</Text>
           </TouchableOpacity>
         </TouchableOpacity>

@@ -11,10 +11,16 @@ import {
   setDefaultReadingDirection,
 } from '@features/reader/readingDirection';
 import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
-import { getReadStats, ReadStats } from '@features/history/readingLog';
-import { getNightDimmingEnabled, setNightDimmingEnabled } from '@features/reader/readerPrefs';
+import { getReadStats, getSessionStats, ReadStats, SessionStats } from '@features/history/readingLog';
+import {
+  getAutoNextEnabled,
+  getNightDimmingEnabled,
+  setAutoNextEnabled,
+  setNightDimmingEnabled,
+} from '@features/reader/readerPrefs';
 import { exportBackup } from './backup';
 import { restoreBackupFromFile } from './restoreBackup';
+import { deleteSavedFilter, getSavedFilters, SavedFilter } from '@features/library/savedFilters';
 import { getOfflineMode, setOfflineMode } from '@features/offline/offlineMode';
 import { clearPrefetchCache, prefetchCacheBytes } from '@features/reader/pagePrefetch';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
@@ -60,16 +66,22 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const [readStats, setReadStats] = useState<ReadStats | null>(null);
+  const [sessionStats, setSessionStats] = useState<SessionStats | null>(null);
   const [nightDimming, setNightDimming] = useState(false);
   const [offlineMode, setOfflineModeState] = useState(false);
   const [prefetchBytes, setPrefetchBytes] = useState(0);
+  const [autoNext, setAutoNextState] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const refreshPrefetchBytes = () => {
     prefetchCacheBytes().then(setPrefetchBytes).catch(() => setPrefetchBytes(0));
   };
   useEffect(() => {
     refreshPrefetchBytes();
     getReadStats().then(setReadStats);
+    getSessionStats().then(setSessionStats);
     getNightDimmingEnabled().then(setNightDimming);
+    getAutoNextEnabled().then(setAutoNextState);
+    getSavedFilters().then(setSavedFilters);
     getOfflineMode().then(setOfflineModeState);
   }, []);
 
@@ -148,7 +160,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         {servers.map(server => {
           const isActive = server.id === activeServer?.id;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={server.id}
               style={[
                 styles.card,
@@ -185,7 +197,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                 style={{ marginRight: spacing.md }}>
                 <Text style={[typography.footnote, { color: colors.accent }]}>Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => confirmRemoveServer(server.id, server.baseUrl)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={[typography.footnote, { color: colors.danger }]}>Quitar</Text>
@@ -194,7 +206,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           );
         })}
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.card, styles.addCard, { borderColor: colors.separator, borderRadius: radii.md }]}
           onPress={() => navigation.navigate('AddServer')}>
           <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>+ Añadir servidor</Text>
@@ -211,7 +223,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           {THEME_OPTIONS.map(option => {
             const active = preference === option.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={option.value}
                 style={[
                   styles.segmentItem,
@@ -242,7 +254,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           {DIRECTION_OPTIONS.map(option => {
             const active = readingDirection === option.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={option.value}
                 style={[
                   styles.segmentItem,
@@ -281,6 +293,12 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
               <Text style={[typography.footnote, { color: colors.secondaryLabel, marginTop: spacing.sm }]}>
                 Últimos 7 días: {readStats.last7Days.join(' · ')} páginas
               </Text>
+              {sessionStats && (
+                <Text style={[typography.footnote, { color: colors.secondaryLabel, marginTop: spacing.xs }]}>
+                  {sessionStats.sessions} sesiones · {sessionStats.totalMinutes} min en total · {sessionStats.rereadBooks}{' '}
+                  {sessionStats.rereadBooks === 1 ? 'número releído' : 'números releídos'}
+                </Text>
+              )}
             </>
           ) : null}
         </View>
@@ -308,12 +326,12 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
           COPIA DE SEGURIDAD
         </Text>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           onPress={onExportBackup}
           style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
           <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Exportar copia a Descargas</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           onPress={onImportBackup}
           style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginTop: spacing.xs }]}>
           <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Importar copia desde archivo</Text>
@@ -338,7 +356,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                     {formatBytes(record.bytes)} · {record.pages.length} páginas
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => confirmDeleteDownload(record.bookId, record.title)}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => confirmDeleteDownload(record.bookId, record.title)}>
                   <Text style={[typography.footnote, { color: colors.danger }]}>Borrar</Text>
                 </TouchableOpacity>
               </View>
@@ -362,6 +380,43 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             </View>
           </>
         )}
+
+        {savedFilters.length > 0 && (
+          <>
+            <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+              SECCIONES DE INICIO
+            </Text>
+            {savedFilters.map(filter => (
+              <View key={filter.id} style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginBottom: spacing.xs }]}>
+                <Text style={[typography.body, { color: colors.label, flex: 1 }]} numberOfLines={1}>
+                  {filter.name}
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => setSavedFilters(await deleteSavedFilter(filter.id))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Quitar sección ${filter.name}`}>
+                  <Text style={[typography.footnote, { color: colors.danger }]}>Quitar</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
+        )}
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          SIGUIENTE NÚMERO
+        </Text>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1, marginRight: spacing.sm }]}>
+            Abrir el siguiente número tras 5 segundos al terminar
+          </Text>
+          <Switch
+            value={autoNext}
+            onValueChange={value => {
+              setAutoNextState(value);
+              setAutoNextEnabled(value);
+            }}
+          />
+        </View>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
           CACHÉ

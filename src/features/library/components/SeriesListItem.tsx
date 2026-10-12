@@ -21,7 +21,7 @@ export function SeriesListItem({ series, onPress }: Props) {
   const badgeCount = hasProgress ? series.booksInProgressCount : series.booksUnreadCount;
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, { paddingVertical: spacing.sm }]}
       onPress={onPress}
       activeOpacity={0.7}>

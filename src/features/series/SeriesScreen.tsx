@@ -322,7 +322,7 @@ export function SeriesScreen({ route, navigation }: Props) {
       )}
 
       {!!metadata?.summary && (
-        <TouchableOpacity onPress={() => setSummaryExpanded(v => !v)} style={{ marginTop: spacing.md }}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => setSummaryExpanded(v => !v)} style={{ marginTop: spacing.md }}>
           <Text
             style={[typography.subhead, { color: colors.label, lineHeight: 20 }]}
             numberOfLines={summaryExpanded ? undefined : 4}>

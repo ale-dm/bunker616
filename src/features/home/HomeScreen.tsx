@@ -21,6 +21,7 @@ import { getFavoriteIds } from '@features/library/favorites';
 import { getSeriesLastSeen } from '@features/library/seriesSeen';
 import { flushPendingProgress } from '@features/sync/progressQueue';
 import { useOfflineMode } from '@features/offline/offlineMode';
+import { getSavedFilters, SavedFilter } from '@features/library/savedFilters';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { localPageUri } from '@features/offline/offlineStore';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
@@ -47,6 +48,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
   const columns = useGridColumns();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
 
   const inProgressQuery = useQuery({
     queryKey: ['home', 'in-progress'],
@@ -115,6 +117,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
 
   useFocusEffect(
     useCallback(() => {
+      getSavedFilters().then(setSavedFilters);
       queryClient.invalidateQueries({ queryKey: ['home', 'following'] });
       if (api) {
         flushPendingProgress(api);
@@ -178,7 +181,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
         <View style={[styles.headerStripe, { backgroundColor: colors.progress }]} />
         <View style={[styles.headerRow, { paddingHorizontal: spacing.lg }]}>
           <Text style={[typography.largeTitle, styles.headerTitle, { color: colors.label }]}>Inicio</Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={() => navigation.navigate('Search')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.searchButton, { backgroundColor: colors.secondaryBackground, borderRadius: radii.pill }]}>
@@ -203,7 +206,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
         {heroItem && (
           <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
             <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.sm }]}>Sigue leyendo</Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[
                 styles.heroCard,
                 { backgroundColor: colors.card, borderRadius: radii.lg, borderLeftColor: colors.progress },
@@ -243,6 +246,10 @@ function OnlineHome({ navigation }: HomeScreenProps) {
         {recommendationItems.length > 0 && (
           <MediaRail title={`Porque lees ${recommendationQuery.data?.genre ?? ''}`} items={recommendationItems} />
         )}
+
+        {savedFilters.map(filter => (
+          <SavedFilterRail key={filter.id} filter={filter} navigation={navigation} />
+        ))}
 
         <SectionHeader title="Explorar por género" />
         <FlatList
@@ -350,4 +357,24 @@ function OfflineHome({ navigation }: HomeScreenProps) {
       </ScrollView>
     </View>
   );
+}
+
+function SavedFilterRail({ filter, navigation }: { filter: SavedFilter; navigation: HomeScreenProps['navigation'] }) {
+  const { api, credentials } = useAuth();
+  const seriesQuery = useQuery({
+    queryKey: ['home', 'saved-filter', filter.id],
+    queryFn: () => getSeries(api!, { search: buildSeriesSearchQuery(filter.filters), size: 12, sort: 'title' }),
+    enabled: !!api,
+  });
+  const baseUrl = credentials?.baseUrl ?? '';
+  const items = (seriesQuery.data?.content ?? []).map(series => ({
+    id: series.id,
+    title: series.metadata.title || series.name,
+    coverUri: seriesCoverUri(baseUrl, series.id),
+    onPress: () => navigation.navigate('Series', { seriesId: series.id, title: series.metadata.title || series.name }),
+  }));
+  if (items.length === 0) {
+    return null;
+  }
+  return <MediaRail title={filter.name} items={items} />;
 }

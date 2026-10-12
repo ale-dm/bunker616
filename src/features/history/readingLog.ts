@@ -52,3 +52,42 @@ export async function getReadStats(): Promise<ReadStats> {
 
   return { today: log[dayKey(today)] ?? 0, last7Days, streak };
 }
+
+const SESSIONS_KEY = 'bunker616.readSessions';
+const MAX_SESSIONS = 500;
+
+export interface ReadingSession {
+  bookId: string;
+  day: string;
+  durationMs: number;
+  pagesTurned: number;
+}
+
+export interface SessionStats {
+  sessions: number;
+  totalMinutes: number;
+  rereadBooks: number;
+}
+
+export async function recordReadingSession(session: Omit<ReadingSession, 'day'>): Promise<void> {
+  const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+  const sessions: ReadingSession[] = raw ? JSON.parse(raw) : [];
+  sessions.push({ ...session, day: dayKey() });
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(-MAX_SESSIONS)));
+}
+
+export async function getSessionStats(): Promise<SessionStats> {
+  const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+  const sessions: ReadingSession[] = raw ? JSON.parse(raw) : [];
+  const daysPerBook = new Map<string, Set<string>>();
+  sessions.forEach(session => {
+    const days = daysPerBook.get(session.bookId) ?? new Set<string>();
+    days.add(session.day);
+    daysPerBook.set(session.bookId, days);
+  });
+  return {
+    sessions: sessions.length,
+    totalMinutes: Math.round(sessions.reduce((sum, session) => sum + session.durationMs, 0) / 60000),
+    rereadBooks: [...daysPerBook.values()].filter(days => days.size > 1).length,
+  };
+}

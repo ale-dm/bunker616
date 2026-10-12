@@ -28,7 +28,7 @@ export function ListsSection({ onOpenSeries }: Props) {
 
   return (
     <View style={{ flex: 1, paddingHorizontal: spacing.lg }}>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         onPress={() => openModal(undefined)}
         style={[styles.newButton, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginTop: spacing.md }]}>
         <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>+ Nueva lista</Text>

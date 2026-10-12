@@ -50,7 +50,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
             No se pudo verificar tu identidad. Inténtalo de nuevo.
           </Text>
         )}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.button, { backgroundColor: colors.accent, borderRadius: radii.md }]}
           onPress={attemptUnlock}>
           <Text style={[typography.headline, { color: '#FFFFFF' }]}>Desbloquear</Text>

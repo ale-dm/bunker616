@@ -57,13 +57,14 @@ import { Bookmark, getBookmarks, toggleBookmark } from './bookmarks';
 import { cachedPagePath, prefetchPages } from './pagePrefetch';
 import {
   FitMode,
+  getAutoNextEnabled,
   getNightDimmingEnabled,
   getSplitSpreads,
   setSplitSpreads,
   isNightHour,
   setFitMode,
 } from './readerPrefs';
-import { recordPageTurn } from '@features/history/readingLog';
+import { recordPageTurn, recordReadingSession } from '@features/history/readingLog';
 
 const GESTURE_HINT_KEY = 'bunker616.gestureHintSeen';
 
@@ -141,6 +142,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [, setPrefetchTick] = useState(0);
   const sessionStartRef = useRef(Date.now());
   const sessionTurnsRef = useRef(0);
+  const incognitoRef = useRef(false);
   const { record, progress } = useOfflineBook(bookId);
 
   const seriesQuery = useQuery({
@@ -186,6 +188,16 @@ export function ReaderScreen({ route, navigation }: Props) {
     await clearSeriesPreset(seriesId);
     setPresetStatus(await getPresetStatus(libraryId, seriesId));
   };
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    return () => {
+      const durationMs = Date.now() - startedAt;
+      if (!incognitoRef.current && durationMs > 5000) {
+        recordReadingSession({ bookId, durationMs, pagesTurned: sessionTurnsRef.current });
+      }
+    };
+  }, [bookId]);
 
   useEffect(() => {
     getBookmarks(bookId).then(setBookmarks);
@@ -270,6 +282,35 @@ export function ReaderScreen({ route, navigation }: Props) {
   const nextBook =
     currentBookIndex >= 0 ? seriesBooksQuery.data?.content[currentBookIndex + 1] : undefined;
 
+  const [autoNext, setAutoNext] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [autoNextCancelled, setAutoNextCancelled] = useState(false);
+  useEffect(() => {
+    getAutoNextEnabled().then(setAutoNext);
+  }, []);
+  const shouldCountdown = autoNext && isAtEnd && !!nextBook && !autoNextCancelled;
+  useEffect(() => {
+    if (!shouldCountdown) {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(5);
+    const timer = setInterval(() => {
+      setCountdown(value => (value === null || value <= 0 ? value : value - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [shouldCountdown, nextBook?.id]);
+  useEffect(() => {
+    if (countdown === 0 && nextBook) {
+      navigation.replace('Reader', {
+        bookId: nextBook.id,
+        title: nextBook.metadata.title || nextBook.name,
+        seriesId,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
+
   // Un capítulo descargado se abre aunque no haya conexión con el servidor.
   const waitingForServer = !record && (bookQuery.isLoading || pagesQuery.isLoading);
   if (!credentials || !prefsLoaded || waitingForServer) {
@@ -296,6 +337,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   const authHeader = getAuthHeader(credentials);
   const progressRatio = pages.length > 0 ? (activeIndex + 1) / pages.length : 0;
   const bookTitle = bookQuery.data?.metadata.title || title;
+
+  incognitoRef.current = incognito;
 
   const handlePageIndexChange = (pageIndex: number) => {
     if (!incognito && pageIndex !== activeIndex) {
@@ -446,11 +489,13 @@ export function ReaderScreen({ route, navigation }: Props) {
             <CoverImage uri={bookThumbnailUrl(credentials.baseUrl, nextBook.id)} style={styles.nextCoverImage} />
           </View>
           <View style={styles.nextInfo}>
-            <Text style={styles.nextLabel}>SIGUIENTE</Text>
+            <Text style={styles.nextLabel}>
+              {countdown !== null ? `SIGUIENTE EN ${countdown} s` : 'SIGUIENTE'}
+            </Text>
             <Text style={styles.nextTitle} numberOfLines={2}>
               {nextBook.metadata.title || nextBook.name}
             </Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.nextButton}
               onPress={() =>
                 navigation.replace('Reader', {
@@ -461,6 +506,15 @@ export function ReaderScreen({ route, navigation }: Props) {
               }>
               <Text style={styles.nextButtonText}>Leer ▸</Text>
             </TouchableOpacity>
+            {countdown !== null && (
+              <TouchableOpacity
+                onPress={() => setAutoNextCancelled(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar apertura automática del siguiente número"
+                style={styles.nextCancel}>
+                <Text style={styles.nextCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -468,7 +522,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       {showOverlay && (
         <>
           <View style={[styles.overlayTop, { paddingTop: insets.top + 8 }]}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => navigation.goBack()}>
               <Text style={styles.backButton}>‹ Volver</Text>
             </TouchableOpacity>
             <Text style={styles.overlayTitle} numberOfLines={1}>
@@ -482,7 +536,7 @@ export function ReaderScreen({ route, navigation }: Props) {
               style={styles.infoButton}>
               <Text style={styles.infoButtonText}>ⓘ</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPageGrid(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setShowPageGrid(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.pageCounter}>
                 {activeIndex + 1} / {pages.length}
               </Text>
@@ -585,11 +639,11 @@ export function ReaderScreen({ route, navigation }: Props) {
       )}
 
       <Modal visible={showInfo} transparent animationType="fade" onRequestClose={() => setShowInfo(false)}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.infoBackdrop}
           activeOpacity={1}
           onPress={() => setShowInfo(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.infoSheet}>
+          <TouchableOpacity accessibilityRole="button" activeOpacity={1} style={styles.infoSheet}>
             <Text style={styles.infoTitle}>{bookTitle}</Text>
             {!!bookQuery.data?.metadata.number && (
               <Text style={styles.infoSubtitle}>Número {bookQuery.data.metadata.number}</Text>
@@ -609,7 +663,7 @@ export function ReaderScreen({ route, navigation }: Props) {
             {bookmarks.length > 0 && (
               <ScrollView style={styles.bookmarkList}>
                 {bookmarks.map(bookmark => (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     key={bookmark.pageIndex}
                     style={styles.bookmarkItem}
                     onPress={() => {
@@ -627,33 +681,33 @@ export function ReaderScreen({ route, navigation }: Props) {
                 Descargando {progress.done} / {progress.total}…
               </Text>
             ) : record ? (
-              <TouchableOpacity onPress={removeDownload} style={styles.offlineButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={removeDownload} style={styles.offlineButton}>
                 <Text style={styles.offlineButtonText}>
                   Eliminar descarga · {formatBytes(record.bytes)}
                 </Text>
               </TouchableOpacity>
             ) : pagesQuery.data ? (
-              <TouchableOpacity onPress={startDownload} style={styles.offlineButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={startDownload} style={styles.offlineButton}>
                 <Text style={styles.offlineButtonText}>Descargar para leer sin conexión</Text>
               </TouchableOpacity>
             ) : null}
 
             <Text style={styles.presetTitle}>AJUSTES DE LECTURA</Text>
-            <TouchableOpacity onPress={() => saveForScope('series')} style={styles.offlineButton}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => saveForScope('series')} style={styles.offlineButton}>
               <Text style={styles.offlineButtonText}>Guardar estos ajustes para esta serie</Text>
             </TouchableOpacity>
             {!!libraryId && (
-              <TouchableOpacity onPress={() => saveForScope('library')} style={styles.offlineButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => saveForScope('library')} style={styles.offlineButton}>
                 <Text style={styles.offlineButtonText}>Guardar estos ajustes para toda la biblioteca</Text>
               </TouchableOpacity>
             )}
             {presetStatus.series && (
-              <TouchableOpacity onPress={removeSeriesPreset} style={styles.offlineButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={removeSeriesPreset} style={styles.offlineButton}>
                 <Text style={styles.offlineButtonText}>Quitar ajustes propios de esta serie</Text>
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={styles.infoCloseButton} onPress={() => setShowInfo(false)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.infoCloseButton} onPress={() => setShowInfo(false)}>
               <Text style={styles.infoCloseText}>Cerrar</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -667,7 +721,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         <View style={[styles.gridContainer, { paddingTop: insets.top }]}>
           <View style={styles.gridHeader}>
             <Text style={styles.gridTitle}>Páginas</Text>
-            <TouchableOpacity onPress={() => setShowPageGrid(false)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setShowPageGrid(false)}>
               <Text style={styles.gridCloseText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
@@ -677,7 +731,7 @@ export function ReaderScreen({ route, navigation }: Props) {
             keyExtractor={page => String(page.number)}
             contentContainerStyle={styles.gridList}
             renderItem={({ item: page, index }) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.gridItem, index === activeIndex && styles.gridItemActive]}
                 onPress={() => {
                   setShowPageGrid(false);
@@ -854,4 +908,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   nextButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  nextCancel: { alignSelf: 'flex-start', marginTop: 6, paddingVertical: 4 },
+  nextCancelText: { color: '#8e8e93', fontSize: 13 },
 });

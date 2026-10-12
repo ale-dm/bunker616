@@ -61,7 +61,7 @@ export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function Webtoo
       renderItem={({ item }) => {
         const aspect = item.width && item.height ? item.height / item.width : FALLBACK_ASPECT;
         return (
-          <TouchableOpacity activeOpacity={1} onPress={onTapCenter}>
+          <TouchableOpacity accessibilityRole="button" activeOpacity={1} onPress={onTapCenter}>
             <Image
               source={getPageSource(item)}
               style={{ width: SCREEN_W, height: SCREEN_W * aspect, backgroundColor }}

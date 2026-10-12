@@ -22,7 +22,7 @@ export function SeriesGridItem({ series, onPress, columns = 3 }: Props) {
   const badgeCount = hasProgress ? series.booksInProgressCount : series.booksUnreadCount;
 
   return (
-    <TouchableOpacity style={[styles.card, { width: `${100 / columns - 2}%` }]} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity accessibilityRole="button" style={[styles.card, { width: `${100 / columns - 2}%` }]} onPress={onPress} activeOpacity={0.8}>
       <View style={[styles.shadowWrapper, { shadowColor: colors.label }]}>
         <View
           style={[

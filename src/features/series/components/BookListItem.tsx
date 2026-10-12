@@ -25,7 +25,7 @@ export function BookListItem({ book, onPress, onToggleRead }: Props) {
     : 0;
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, { paddingVertical: spacing.sm }]}
       onPress={onPress}
       activeOpacity={0.7}>
@@ -46,7 +46,7 @@ export function BookListItem({ book, onPress, onToggleRead }: Props) {
           </View>
         )}
       </View>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         onPress={onToggleRead}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={[

@@ -84,7 +84,7 @@ export function SearchScreen({ navigation }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={[styles.header, { paddingHorizontal: spacing.lg }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={[typography.body, { color: colors.accent }]}>‹ Volver</Text>
         </TouchableOpacity>
         <TextInput
@@ -149,7 +149,7 @@ export function SearchScreen({ navigation }: Props) {
             <>
               {sectionTitle('Series')}
               {seriesQuery.data.content.map(series => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={series.id}
                   style={styles.row}
                   onPress={() =>
@@ -170,7 +170,7 @@ export function SearchScreen({ navigation }: Props) {
             <>
               {sectionTitle('Números')}
               {booksQuery.data.content.map(book => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={book.id}
                   style={styles.row}
                   onPress={() =>
@@ -195,7 +195,7 @@ export function SearchScreen({ navigation }: Props) {
             <>
               {sectionTitle('Colecciones')}
               {matchingCollections.map(collection => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={collection.id}
                   style={styles.row}
                   onPress={() => navigation.navigate('Collection', { collectionId: collection.id, title: collection.name })}>

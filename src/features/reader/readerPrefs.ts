@@ -38,3 +38,13 @@ export async function getSplitSpreads(): Promise<boolean> {
 export async function setSplitSpreads(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(SPLIT_KEY, enabled ? 'true' : 'false');
 }
+
+const AUTO_NEXT_KEY = 'bunker616.autoNextNumber';
+
+export async function getAutoNextEnabled(): Promise<boolean> {
+  return (await AsyncStorage.getItem(AUTO_NEXT_KEY)) === 'true';
+}
+
+export async function setAutoNextEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(AUTO_NEXT_KEY, enabled ? 'true' : 'false');
+}

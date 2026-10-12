@@ -151,7 +151,7 @@ export function LoginScreen({ onSuccess, editingServer }: Props) {
           </Text>
         )}
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[
             styles.button,
             { backgroundColor: colors.accent, borderRadius: radii.md },

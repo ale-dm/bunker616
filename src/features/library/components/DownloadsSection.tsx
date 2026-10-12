@@ -28,7 +28,7 @@ export function DownloadsSection() {
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xl }}
         ListEmptyComponent={<EmptyState message="No tienes números descargados. Puedes descargarlos desde el lector." />}
         renderItem={({ item }) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onLongPress={() => confirmDelete(item.bookId, item.title)}
             onPress={() => confirmDelete(item.bookId, item.title)}
             style={[styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginBottom: spacing.sm }]}>

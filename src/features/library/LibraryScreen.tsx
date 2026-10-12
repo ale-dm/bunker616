@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { saveFilter } from './savedFilters';
+import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -151,6 +153,22 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
     enabled: !!api,
   });
 
+  const libraryProgressQueries = useQueries({
+    queries: (librariesQuery.data ?? []).map(library => ({
+      queryKey: ['library-progress', library.id],
+      queryFn: async () => {
+        const page = await getSeries(api!, { libraryId: library.id, size: 500 });
+        const total = page.content.reduce((sum, series) => sum + series.booksCount, 0);
+        const read = page.content.reduce((sum, series) => sum + series.booksReadCount, 0);
+        return total > 0 ? Math.round((read / total) * 100) : 0;
+      },
+      enabled: !!api,
+    })),
+  });
+  const percentByLibrary = new Map(
+    (librariesQuery.data ?? []).map((library, index) => [library.id, libraryProgressQueries[index]?.data]),
+  );
+
   const collectionsQuery = useQuery({
     queryKey: ['collections'],
     queryFn: () => getCollections(api!),
@@ -243,7 +261,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
             value={search}
             onChangeText={setSearch}
           />
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={openFilters}
             style={[
               styles.filterButton,
@@ -263,11 +281,11 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
         transparent
         animationType="fade"
         onRequestClose={() => setShowFilters(false)}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.filtersBackdrop}
           activeOpacity={1}
           onPress={() => setShowFilters(false)}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             activeOpacity={1}
             style={[styles.filtersSheet, { backgroundColor: colors.secondaryBackground, borderRadius: radii.lg }]}>
             <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.md }]}>
@@ -319,10 +337,21 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
             </View>
 
             <View style={[styles.filtersActions, { marginTop: spacing.md }]}>
-              <TouchableOpacity onPress={clearFilters} style={styles.filtersActionButton}>
+              <TouchableOpacity accessibilityRole="button" onPress={clearFilters} style={styles.filtersActionButton}>
                 <Text style={[typography.body, { color: colors.danger }]}>Limpiar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              {!!(draftAuthor || draftGenre || draftStatus) && (
+                <TouchableOpacity accessibilityRole="button"
+                  onPress={() => {
+                    saveFilter({ author: draftAuthor, genre: draftGenre, status: draftStatus });
+                    setShowFilters(false);
+                    Alert.alert('Sección guardada', 'Aparecerá en Inicio.');
+                  }}
+                  style={styles.filtersActionButton}>
+                  <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Guardar en Inicio</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity accessibilityRole="button"
                 onPress={applyFilters}
                 style={[styles.filtersActionButton, styles.filtersApplyButton, { backgroundColor: colors.accent, borderRadius: radii.md }]}>
                 <Text style={[typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>Aplicar</Text>
@@ -341,7 +370,15 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           data={[{ id: undefined, name: 'Todas' }, ...librariesQuery.data]}
           keyExtractor={item => item.id ?? 'all'}
           renderItem={({ item }) => (
-            <Chip label={item.name} active={libraryId === item.id} onPress={() => setLibraryId(item.id)} />
+            <Chip
+              label={
+                item.id && percentByLibrary.get(item.id) !== undefined
+                  ? `${item.name} · ${percentByLibrary.get(item.id)}%`
+                  : item.name
+              }
+              active={libraryId === item.id}
+              onPress={() => setLibraryId(item.id)}
+            />
           )}
         />
       )}
@@ -355,7 +392,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           data={collectionsQuery.data.content}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[
                 styles.collectionCard,
                 { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
@@ -381,7 +418,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           data={readListsQuery.data.content}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[
                 styles.collectionCard,
                 { backgroundColor: colors.secondaryBackground, borderRadius: radii.md },
@@ -410,7 +447,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
           {SORT_OPTIONS.map(option => {
             const active = sort === option.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={option.value}
                 onPress={() => setSort(option.value)}
                 style={{ marginRight: spacing.md }}>
