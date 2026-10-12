@@ -1,10 +1,9 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
-import { Dimensions, FlatList, Image, TouchableOpacity } from 'react-native';
+import { FlatList, Image, TouchableOpacity, useWindowDimensions } from 'react-native';
 import type { ListViewToken as ViewToken } from '@react-native/virtualized-lists';
 import { BookPage } from '@shared/types/komga';
 import { PageSource } from '../types';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const FALLBACK_ASPECT = 1.4; // alto/ancho típico de una página de cómic
 
 export interface WebtoonReaderRef {
@@ -24,6 +23,7 @@ export const WebtoonReader = forwardRef<WebtoonReaderRef, Props>(function Webtoo
   { pages, getPageSource, backgroundColor, initialPageIndex, onPageIndexChange, onTapCenter },
   ref,
 ) {
+  const { width: SCREEN_W } = useWindowDimensions();
   const listRef = useRef<FlatList<BookPage>>(null);
 
   useImperativeHandle(ref, () => ({

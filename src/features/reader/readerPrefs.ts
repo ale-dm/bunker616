@@ -48,3 +48,13 @@ export async function getAutoNextEnabled(): Promise<boolean> {
 export async function setAutoNextEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(AUTO_NEXT_KEY, enabled ? 'true' : 'false');
 }
+
+const VOLUME_PAGES_KEY = 'bunker616.volumeKeys';
+
+export async function getVolumePageTurnEnabled(): Promise<boolean> {
+  return (await AsyncStorage.getItem(VOLUME_PAGES_KEY)) === 'true';
+}
+
+export async function setVolumePageTurnEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(VOLUME_PAGES_KEY, enabled ? 'true' : 'false');
+}

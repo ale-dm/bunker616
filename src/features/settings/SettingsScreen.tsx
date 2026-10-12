@@ -15,9 +15,16 @@ import { getReadStats, getSessionStats, ReadStats, SessionStats } from '@feature
 import {
   getAutoNextEnabled,
   getNightDimmingEnabled,
+  getVolumePageTurnEnabled,
   setAutoNextEnabled,
   setNightDimmingEnabled,
+  setVolumePageTurnEnabled,
 } from '@features/reader/readerPrefs';
+import {
+  getNewIssueAlertsEnabled,
+  setNewIssueAlertsEnabled,
+} from '@features/notifications/newIssueAlerts';
+import { requestNotificationPermission } from '@shared/native/appNative';
 import { exportBackup } from './backup';
 import { restoreBackupFromFile } from './restoreBackup';
 import { deleteSavedFilter, getSavedFilters, SavedFilter } from '@features/library/savedFilters';
@@ -71,6 +78,8 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [offlineMode, setOfflineModeState] = useState(false);
   const [prefetchBytes, setPrefetchBytes] = useState(0);
   const [autoNext, setAutoNextState] = useState(false);
+  const [volumePageTurn, setVolumePageTurnState] = useState(false);
+  const [newIssueAlerts, setNewIssueAlertsState] = useState(false);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const refreshPrefetchBytes = () => {
     prefetchCacheBytes().then(setPrefetchBytes).catch(() => setPrefetchBytes(0));
@@ -81,6 +90,8 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
     getSessionStats().then(setSessionStats);
     getNightDimmingEnabled().then(setNightDimming);
     getAutoNextEnabled().then(setAutoNextState);
+    getVolumePageTurnEnabled().then(setVolumePageTurnState);
+    getNewIssueAlertsEnabled().then(setNewIssueAlertsState);
     getSavedFilters().then(setSavedFilters);
     getOfflineMode().then(setOfflineModeState);
   }, []);
@@ -414,6 +425,43 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             onValueChange={value => {
               setAutoNextState(value);
               setAutoNextEnabled(value);
+            }}
+          />
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          LECTOR Y AVISOS
+        </Text>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1, marginRight: spacing.sm }]}>
+            Pasar páginas con el volumen (abajo, siguiente; arriba, anterior)
+          </Text>
+          <Switch
+            value={volumePageTurn}
+            accessibilityLabel="Pasar páginas con el volumen"
+            onValueChange={value => {
+              setVolumePageTurnState(value);
+              setVolumePageTurnEnabled(value);
+            }}
+          />
+        </View>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1, marginRight: spacing.sm }]}>
+            Avisar de números nuevos de tus favoritos al abrir la app
+          </Text>
+          <Switch
+            value={newIssueAlerts}
+            accessibilityLabel="Avisar de números nuevos"
+            onValueChange={async value => {
+              if (value && !(await requestNotificationPermission())) {
+                Alert.alert(
+                  'Sin permiso',
+                  'Activa las notificaciones de Bunker616 en los ajustes de Android para recibir avisos.',
+                );
+                return;
+              }
+              setNewIssueAlertsState(value);
+              await setNewIssueAlertsEnabled(value);
             }}
           />
         </View>

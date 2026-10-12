@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dimensions, StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -10,7 +10,6 @@ import Animated, {
 import { PageSource } from '../types';
 import { FitMode } from '../readerPrefs';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
 
@@ -40,12 +39,15 @@ function clampTranslation(
 export function ZoomablePage({
   source,
   onTap,
-  width = SCREEN_W,
-  height = SCREEN_H,
+  width,
+  height,
   xOffset = 0,
   backgroundColor = '#000000',
   fitMode = 'contain',
 }: Props) {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
+  const pageWidth = width ?? SCREEN_W;
+  const pageHeight = height ?? SCREEN_H;
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -61,8 +63,8 @@ export function ZoomablePage({
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      translateX.value = clampTranslation(translateX.value, scale.value, width);
-      translateY.value = clampTranslation(translateY.value, scale.value, height);
+      translateX.value = clampTranslation(translateX.value, scale.value, pageWidth);
+      translateY.value = clampTranslation(translateY.value, scale.value, pageHeight);
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
       runOnJS(setIsZoomed)(scale.value > 1.05);
@@ -74,12 +76,12 @@ export function ZoomablePage({
       translateX.value = clampTranslation(
         savedTranslateX.value + event.translationX,
         scale.value,
-        width,
+        pageWidth,
       );
       translateY.value = clampTranslation(
         savedTranslateY.value + event.translationY,
         scale.value,
-        height,
+        pageHeight,
       );
     })
     .onEnd(() => {
@@ -119,10 +121,10 @@ export function ZoomablePage({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.container, { width, height, backgroundColor }]}>
+      <Animated.View style={[styles.container, { width: pageWidth, height: pageHeight, backgroundColor }]}>
         <Animated.Image
           source={source}
-          style={[styles.image, { width, height }, animatedStyle]}
+          style={[styles.image, { width: pageWidth, height: pageHeight }, animatedStyle]}
           resizeMode={fitMode}
         />
       </Animated.View>

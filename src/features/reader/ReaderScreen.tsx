@@ -60,11 +60,17 @@ import {
   getAutoNextEnabled,
   getNightDimmingEnabled,
   getSplitSpreads,
+  getVolumePageTurnEnabled,
   setSplitSpreads,
   isNightHour,
   setFitMode,
 } from './readerPrefs';
 import { recordPageTurn, recordReadingSession } from '@features/history/readingLog';
+import {
+  onVolumeKey,
+  setReaderLandscapeLock,
+  setVolumeKeysEnabled,
+} from '@shared/native/appNative';
 
 const GESTURE_HINT_KEY = 'bunker616.gestureHintSeen';
 
@@ -288,6 +294,29 @@ export function ReaderScreen({ route, navigation }: Props) {
   useEffect(() => {
     getAutoNextEnabled().then(setAutoNext);
   }, []);
+  const [volumePageTurn, setVolumePageTurn] = useState(false);
+  useEffect(() => {
+    getVolumePageTurnEnabled().then(setVolumePageTurn);
+  }, []);
+  // Con dobles páginas el lector se queda en horizontal; al salir o cambiar a
+  // webtoon se libera la orientación.
+  useEffect(() => {
+    setReaderLandscapeLock(readerMode === 'paged' && doublePage);
+    return () => setReaderLandscapeLock(false);
+  }, [readerMode, doublePage]);
+  useEffect(() => {
+    if (!volumePageTurn || readerMode !== 'paged') {
+      return;
+    }
+    setVolumeKeysEnabled(true);
+    const unsubscribe = onVolumeKey(direction => {
+      pagedRef.current?.turnPage(direction === 'down' ? 1 : -1);
+    });
+    return () => {
+      unsubscribe();
+      setVolumeKeysEnabled(false);
+    };
+  }, [volumePageTurn, readerMode]);
   const shouldCountdown = autoNext && isAtEnd && !!nextBook && !autoNextCancelled;
   useEffect(() => {
     if (!shouldCountdown) {

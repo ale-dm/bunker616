@@ -20,6 +20,7 @@ import { useTheme } from '@shared/theme';
 import { getFavoriteIds } from '@features/library/favorites';
 import { getSeriesLastSeen } from '@features/library/seriesSeen';
 import { flushPendingProgress } from '@features/sync/progressQueue';
+import { checkNewIssueAlerts } from '@features/notifications/newIssueAlerts';
 import { useOfflineMode } from '@features/offline/offlineMode';
 import { getSavedFilters, SavedFilter } from '@features/library/savedFilters';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
@@ -121,6 +122,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
       queryClient.invalidateQueries({ queryKey: ['home', 'following'] });
       if (api) {
         flushPendingProgress(api);
+        checkNewIssueAlerts(api).catch(() => undefined);
       }
     }, [queryClient, api]),
   );

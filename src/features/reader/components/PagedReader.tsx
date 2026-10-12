@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Dimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import { BookPage } from '@shared/types/komga';
 import { buildReadingGroups, findSlotGroupIndex, PageSlot } from '../pageGroups';
@@ -13,10 +13,11 @@ import { PageSource } from '../types';
 import { FitMode } from '../readerPrefs';
 import { ZoomablePage } from './ZoomablePage';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 export interface PagedReaderRef {
   goToPage: (pageIndex: number) => void;
+  // 1 = siguiente en orden de lectura, -1 = anterior; avanza una vista (doble o simple).
+  turnPage: (step: 1 | -1) => void;
 }
 
 interface Props {
@@ -47,6 +48,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
   },
   ref,
 ) {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const pagerRef = useRef<PagerView>(null);
   const representativePageRef = useRef(initialPageIndex);
   const isFirstRenderRef = useRef(true);
@@ -82,6 +84,7 @@ export const PagedReader = forwardRef<PagedReaderRef, Props>(function PagedReade
       const position = rtl ? groups.length - 1 - groupIndex : groupIndex;
       pagerRef.current?.setPage(position);
     },
+    turnPage: (step: 1 | -1) => goToGroupReadingIndex(activeGroupReadingIndex + step),
   }));
 
   const activeGroupReadingIndex = rtl ? groups.length - 1 - pagerPosition : pagerPosition;
