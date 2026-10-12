@@ -14,6 +14,9 @@ export function Chip({ label, active = false, onPress }: Props) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={[
         styles.chip,
         { borderRadius: radii.pill, backgroundColor: active ? colors.accent : colors.secondaryBackground },

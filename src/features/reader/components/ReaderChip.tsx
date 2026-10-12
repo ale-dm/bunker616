@@ -15,6 +15,9 @@ export function ReaderChip({ label, active = false, onPress }: Props) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.text, { color: active ? ACTIVE_TEXT : INACTIVE_TEXT }]}>{label}</Text>
     </TouchableOpacity>

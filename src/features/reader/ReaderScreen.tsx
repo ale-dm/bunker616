@@ -34,7 +34,8 @@ import { savePageToGallery } from '@features/offline/gallery';
 import { PagedReader, PagedReaderRef } from './components/PagedReader';
 import { WebtoonReader, WebtoonReaderRef } from './components/WebtoonReader';
 import { useReaderProgress } from './hooks/useReaderProgress';
-import { flushPendingProgress } from '@features/sync/progressQueue';
+import { flushPendingProgress, getPendingProgress } from '@features/sync/progressQueue';
+import { ErrorState } from '@shared/components';
 import {
   nextReaderBackground,
   READER_BACKGROUND_COLORS,
@@ -93,6 +94,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [showPageGrid, setShowPageGrid] = useState(false);
   const [rtl, setRtl] = useState(false);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [pendingStart, setPendingStart] = useState<number | undefined>(undefined);
   const [presetStatus, setPresetStatus] = useState({ series: false, library: false });
   const [doublePage, setDoublePage] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
@@ -127,11 +129,12 @@ export function ReaderScreen({ route, navigation }: Props) {
     if (!seriesSettled || prefsLoaded) {
       return;
     }
-    resolvePrefs(libraryId, seriesId).then(prefs => {
+    Promise.all([resolvePrefs(libraryId, seriesId), getPendingProgress(bookId)]).then(([prefs, pending]) => {
       applyPrefs(prefs);
+      setPendingStart(pending ? (pending.completed ? 0 : pending.page - 1) : undefined);
       setPrefsLoaded(true);
     });
-  }, [seriesSettled, libraryId, seriesId, prefsLoaded]);
+  }, [seriesSettled, libraryId, seriesId, bookId, prefsLoaded]);
 
   useEffect(() => {
     getPresetStatus(libraryId, seriesId).then(setPresetStatus);
@@ -189,12 +192,15 @@ export function ReaderScreen({ route, navigation }: Props) {
   }, [api]);
 
   const initialIndex = useMemo(() => {
+    if (pendingStart !== undefined && pages.length > 0) {
+      return Math.min(Math.max(pendingStart, 0), pages.length - 1);
+    }
     const progressInfo = bookQuery.data?.readProgress;
     if (!progressInfo || progressInfo.completed || pages.length === 0) {
       return 0;
     }
     return Math.min(Math.max(progressInfo.page - 1, 0), pages.length - 1);
-  }, [bookQuery.data, pages.length]);
+  }, [bookQuery.data, pages.length, pendingStart]);
 
   const currentIndex = activePageIndex ?? initialIndex;
   const credentialsBaseUrl = credentials?.baseUrl;
@@ -230,6 +236,18 @@ export function ReaderScreen({ route, navigation }: Props) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator color="#5865f2" size="large" />
+      </View>
+    );
+  }
+
+  if (!record && pagesQuery.isError) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ErrorState
+          message="No se pudieron cargar las páginas de este número."
+          onRetry={() => pagesQuery.refetch()}
+          onBack={() => navigation.goBack()}
+        />
       </View>
     );
   }
@@ -412,6 +430,8 @@ export function ReaderScreen({ route, navigation }: Props) {
             </Text>
             <TouchableOpacity
               onPress={() => setShowInfo(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Información del número"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.infoButton}>
               <Text style={styles.infoButtonText}>ⓘ</Text>
@@ -458,6 +478,9 @@ export function ReaderScreen({ route, navigation }: Props) {
                 <TouchableOpacity
                   key={level}
                   onPress={() => setDimIndex(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Brillo nivel ${index + 1} de ${DIM_LEVELS.length}`}
+                  accessibilityState={{ selected: dimIndex === index }}
                   hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   style={[
                     styles.brightnessDot,

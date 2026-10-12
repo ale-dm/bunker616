@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,6 +15,7 @@ import { SearchScreen } from '@features/search/SearchScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { useTheme } from '@shared/theme';
 import { RootStackParamList, TabParamList } from './types';
+import { TabIcon } from './TabIcon';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -36,7 +37,7 @@ function Tabs() {
         component={HomeScreen}
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color }) => <TabGlyph symbol="⌂" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="home" color={color} focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -44,7 +45,7 @@ function Tabs() {
         component={LibraryScreen}
         options={{
           title: 'Biblioteca',
-          tabBarIcon: ({ color }) => <TabGlyph symbol="▤" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="library" color={color} focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -52,16 +53,13 @@ function Tabs() {
         component={SettingsScreen}
         options={{
           title: 'Ajustes',
-          tabBarIcon: ({ color }) => <TabGlyph symbol="⚙" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="settings" color={color} focused={focused} />,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-function TabGlyph({ symbol, color }: { symbol: string; color: string }) {
-  return <Text style={{ fontSize: 20, color }}>{symbol}</Text>;
-}
 
 export function RootNavigator() {
   const { status } = useAuth();

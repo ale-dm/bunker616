@@ -15,7 +15,7 @@ import {
   getSeriesById,
   getSeriesBooks,
   } from '@shared/api/komga';
-import { Chip, CoverImage, EmptyState, MediaRail, SectionHeader } from '@shared/components';
+import { Chip, CoverImage, EmptyState, ErrorState, MediaRail, SectionHeader } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { getFavoriteIds } from '@features/library/favorites';
 import { getSeriesLastSeen } from '@features/library/seriesSeen';
@@ -224,7 +224,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
           </View>
         )}
 
-        {continueItems.length > 0 && <MediaRail title="Continuar leyendo" items={continueItems} />}
+        {continueItems.length > 0 && <MediaRail title="En curso" items={continueItems} />}
         {finishedItems.length > 0 && <MediaRail title="Terminadas recientemente" items={finishedItems} />}
         {followingItems.length > 0 && <MediaRail title="Siguiendo" subtitle="Series con números nuevos" items={followingItems} />}
         {recommendationItems.length > 0 && (
@@ -261,7 +261,11 @@ function OnlineHome({ navigation }: HomeScreenProps) {
             )}
           />
         ) : (
-          <EmptyState message="Todavía no hay series en la biblioteca." />
+          recentQuery.isError ? (
+            <ErrorState onRetry={() => recentQuery.refetch()} />
+          ) : (
+            <EmptyState message="Todavía no hay series en la biblioteca." />
+          )
         )}
       </ScrollView>
     </View>

@@ -7,7 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { bookThumbnailUrl, getCollections, getSeries, searchBooks } from '@shared/api/komga';
-import { CoverImage, EmptyState } from '@shared/components';
+import { CoverImage, EmptyState, ErrorState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
@@ -52,9 +52,11 @@ export function SearchScreen({ navigation }: Props) {
   );
 
   const isLoading = enabled && (seriesQuery.isLoading || booksQuery.isLoading);
+  const searchFailed = enabled && seriesQuery.isError && booksQuery.isError;
   const noResults =
     enabled &&
     !isLoading &&
+    !searchFailed &&
     !seriesQuery.data?.content.length &&
     !booksQuery.data?.content.length &&
     !matchingCollections.length;
@@ -94,6 +96,13 @@ export function SearchScreen({ navigation }: Props) {
         <EmptyState message="Escribe para buscar en tu servidor." />
       ) : isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
+      ) : searchFailed ? (
+        <ErrorState
+          onRetry={() => {
+            seriesQuery.refetch();
+            booksQuery.refetch();
+          }}
+        />
       ) : noResults ? (
         <EmptyState message={`Sin resultados para "${term}".`} />
       ) : (

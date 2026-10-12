@@ -51,3 +51,7 @@ export async function flushPendingProgress(api: AxiosInstance): Promise<void> {
     }
   }
 }
+
+export async function getPendingProgress(bookId: string): Promise<PendingProgress | undefined> {
+  return (await readStore())[bookId];
+}

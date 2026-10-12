@@ -17,7 +17,12 @@ interface Props {
 export function MediaCard({ coverUri, title, subtitle, subtitleTone = 'secondary', width = 110, stack, onPress }: Props) {
   const { colors, radii, spacing, typography } = useTheme();
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.card, { width }]}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+      style={[styles.card, { width }]}>
       {stack ? (
         <StackedCover seriesId={stack.seriesId} fromBookId={stack.fromBookId} width={width}>
           <View style={[styles.cover, { borderRadius: radii.md, backgroundColor: colors.tertiaryBackground }]}>

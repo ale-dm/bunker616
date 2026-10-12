@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getCollectionSeries } from '@shared/api/komga';
-import { EmptyState } from '@shared/components';
+import { EmptyState, ErrorState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { Series } from '@shared/types/komga';
 import { SeriesGridItem } from '@features/library/components/SeriesGridItem';
@@ -83,7 +83,13 @@ export function CollectionScreen({ route, navigation }: Props) {
               }
             />
           )}
-          ListEmptyComponent={<EmptyState message="Esta colección no tiene series." />}
+          ListEmptyComponent={
+            seriesQuery.isError ? (
+              <ErrorState onRetry={() => seriesQuery.refetch()} />
+            ) : (
+              <EmptyState message="Esta colección no tiene series." />
+            )
+          }
           ListFooterComponent={
             seriesQuery.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : undefined
           }

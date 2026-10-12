@@ -41,6 +41,8 @@ export function ListsSection({ onOpenSeries }: Props) {
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => openModal(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir lista ${item.name}`}
             style={[styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginBottom: spacing.sm }]}>
             <View style={{ flex: 1 }}>
               <Text style={[typography.body, { color: colors.label, fontWeight: '600' }]} numberOfLines={1}>

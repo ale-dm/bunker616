@@ -27,10 +27,8 @@ import {
   SeriesSort,
 } from '@shared/api/komga';
 import { getFavoriteIds } from './favorites';
-import { CustomListsModal } from './components/CustomListsModal';
-import { CustomList, getCustomLists } from './customLists';
 import { useGridColumns } from '@shared/utils/useGridColumns';
-import { Chip, EmptyState, SegmentedControl } from '@shared/components';
+import { Chip, EmptyState, ErrorState, SegmentedControl } from '@shared/components';
 import { DownloadsSection } from './components/DownloadsSection';
 import { ListsSection } from './components/ListsSection';
 import { useTheme } from '@shared/theme';
@@ -76,17 +74,7 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [customLists, setCustomLists] = useState<CustomList[]>([]);
-  const [showListsModal, setShowListsModal] = useState(false);
   const [section, setSection] = useState<LibrarySection>('biblioteca');
-  const [browseListId, setBrowseListId] = useState<string | undefined>(undefined);
-
-  const reloadCustomLists = () => {
-    getCustomLists().then(setCustomLists);
-  };
-  useFocusEffect(useCallback(() => {
-    reloadCustomLists();
-  }, []));
 
   useFocusEffect(
     useCallback(() => {
@@ -377,39 +365,6 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
         />
       )}
 
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, marginTop: spacing.sm }}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-        data={[...customLists.map(list => ({ id: list.id, name: list.name, count: list.seriesIds.length })), { id: '__new', name: '+ Mis listas', count: -1 }]}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.collectionCard, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}
-            onPress={() => {
-              setBrowseListId(item.id === '__new' ? undefined : item.id);
-              setShowListsModal(true);
-            }}>
-            <Text style={[typography.subhead, { color: colors.label, fontWeight: '600' }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {item.count >= 0 && (
-              <Text style={[typography.caption, { color: colors.secondaryLabel, marginTop: 2 }]}>{item.count} series</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      />
-      <CustomListsModal
-        visible={showListsModal}
-        browseListId={browseListId}
-        onClose={() => {
-          setShowListsModal(false);
-          reloadCustomLists();
-        }}
-        onOpenSeries={(seriesId, seriesTitle) => navigation.navigate('Series', { seriesId, title: seriesTitle })}
-      />
-
       {readListsQuery.data && readListsQuery.data.content.length > 0 && (
         <FlatList
           horizontal
@@ -466,13 +421,20 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
         <View style={styles.sortRow}>
           <TouchableOpacity
             onPress={() => setFavoritesOnly(v => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={favoritesOnly ? 'Mostrar todas las series' : 'Mostrar solo favoritas'}
+            accessibilityState={{ selected: favoritesOnly }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginRight: spacing.md }}>
             <Text style={{ fontSize: 16, color: favoritesOnly ? colors.progress : colors.secondaryLabel }}>
               {favoritesOnly ? '★' : '☆'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={toggleViewMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={toggleViewMode}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={viewMode === 'grid' ? 'Ver en lista' : 'Ver en cuadrícula'}>
             <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
               {viewMode === 'grid' ? 'Ver en lista' : 'Ver en grid'}
             </Text>
@@ -517,9 +479,13 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
             );
           }}
           ListEmptyComponent={
-            <EmptyState
-              message={favoritesOnly ? 'Todavía no tienes series favoritas.' : 'No se encontraron series.'}
-            />
+            !favoritesOnly && seriesQuery.isError ? (
+              <ErrorState onRetry={() => seriesQuery.refetch()} />
+            ) : (
+              <EmptyState
+                message={favoritesOnly ? 'Todavía no tienes series favoritas.' : 'No se encontraron series.'}
+              />
+            )
           }
           ListFooterComponent={
             !favoritesOnly && seriesQuery.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : undefined

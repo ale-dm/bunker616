@@ -24,7 +24,7 @@ import { markSeriesSeen } from '@features/library/seriesSeen';
 import { getSeriesNote, setSeriesNote } from './seriesNotes';
 import { CustomListsModal } from '@features/library/components/CustomListsModal';
 import { getFavoriteIds, toggleFavorite } from '@features/library/favorites';
-import { Chip, CoverImage } from '@shared/components';
+import { Chip, CoverImage, EmptyState, ErrorState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { BookListItem } from './components/BookListItem';
 
@@ -245,11 +245,19 @@ export function SeriesScreen({ route, navigation }: Props) {
             <Text style={[typography.title, { color: colors.label, flex: 1 }]} numberOfLines={3}>
               {metadata?.title || title}
             </Text>
-            <TouchableOpacity onPress={onShare} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: spacing.sm }}>
+            <TouchableOpacity
+              onPress={onShare}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Compartir serie"
+              style={{ marginLeft: spacing.sm }}>
               <Text style={{ fontSize: 20, color: colors.accent }}>⇪</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onToggleFavorite}
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+              accessibilityState={{ selected: isFavorite }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{ marginLeft: spacing.sm }}>
               <Text style={{ fontSize: 22, color: isFavorite ? colors.progress : colors.secondaryLabel }}>
@@ -319,7 +327,10 @@ export function SeriesScreen({ route, navigation }: Props) {
         />
       </View>
 
-      <View style={[styles.controlRow, { marginTop: spacing.lg }]}>
+      <Text style={[typography.caption, styles.groupTitle, { color: colors.secondaryLabel, marginTop: spacing.lg }]}>
+        ORDEN Y FILTRO
+      </Text>
+      <View style={styles.controlRow}>
         {SORT_OPTIONS.map(option => (
           <Chip
             key={option.value}
@@ -329,7 +340,7 @@ export function SeriesScreen({ route, navigation }: Props) {
           />
         ))}
       </View>
-      <View style={[styles.controlRow, { marginTop: spacing.sm }]}>
+      <View style={styles.controlRow}>
         {STATUS_FILTERS.map(option => (
           <Chip
             key={option.value}
@@ -339,56 +350,34 @@ export function SeriesScreen({ route, navigation }: Props) {
           />
         ))}
       </View>
-      <View style={[styles.controlRow, { marginTop: spacing.md }]}>
-        <TouchableOpacity
-          onPress={onChangeCover}
-          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Cambiar portada</Text>
-        </TouchableOpacity>
-        {hasCustomCover(seriesId) && (
-          <TouchableOpacity
-            onPress={onRemoveCover}
-            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-            <Text style={[typography.footnote, { color: colors.danger, fontWeight: '600' }]}>Quitar portada</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={() => setShowLists(true)}
-          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Añadir a lista</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+
+      <Text style={[typography.caption, styles.groupTitle, { color: colors.secondaryLabel, marginTop: spacing.md }]}>
+        LECTURA
+      </Text>
+      <View style={styles.controlRow}>
+        <Chip
+          label={seriesMarking ? `Marcando ${seriesMarking.done}/${seriesMarking.total}…` : 'Marcar serie leída'}
           onPress={() => confirmMarkWholeSeries(true)}
-          disabled={!!seriesMarking}
-          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
-            {seriesMarking ? `Marcando ${seriesMarking.done}/${seriesMarking.total}…` : 'Marcar serie leída'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => confirmMarkWholeSeries(false)}
-          disabled={!!seriesMarking}
-          style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-          <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>Marcar sin leer</Text>
-        </TouchableOpacity>
+        />
+        <Chip label="Marcar sin leer" onPress={() => confirmMarkWholeSeries(false)} />
+      </View>
+
+      <Text style={[typography.caption, styles.groupTitle, { color: colors.secondaryLabel, marginTop: spacing.md }]}>
+        COLECCIÓN Y SIN CONEXIÓN
+      </Text>
+      <View style={styles.controlRow}>
+        <Chip label="Añadir a lista" onPress={() => setShowLists(true)} />
+        <Chip label="Cambiar portada" onPress={onChangeCover} />
+        {hasCustomCover(seriesId) && <Chip label="Quitar portada" onPress={onRemoveCover} />}
         {seriesDownload ? (
-          <TouchableOpacity
+          <Chip
+            label={`Descargando ${seriesDownload.done}/${seriesDownload.total} · Cancelar`}
             onPress={() => {
               cancelDownloadRef.current = true;
             }}
-            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-            <Text style={[typography.footnote, { color: colors.label }]}>
-              Descargando serie {seriesDownload.done}/{seriesDownload.total} · Cancelar
-            </Text>
-          </TouchableOpacity>
+          />
         ) : (
-          <TouchableOpacity
-            onPress={downloadSeries}
-            style={[styles.controlChip, { borderRadius: radii.pill, backgroundColor: colors.secondaryBackground }]}>
-            <Text style={[typography.footnote, { color: colors.accent, fontWeight: '600' }]}>
-              Descargar serie para leer sin conexión
-            </Text>
-          </TouchableOpacity>
+          <Chip label="Descargar serie" onPress={downloadSeries} />
         )}
       </View>
     </View>
@@ -404,6 +393,13 @@ export function SeriesScreen({ route, navigation }: Props) {
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingTop: spacing.sm }}
           ListHeaderComponent={infoHeader}
+          ListEmptyComponent={
+            booksQuery.isError ? (
+              <ErrorState onRetry={() => booksQuery.refetch()} />
+            ) : (
+              <EmptyState message="Esta serie no tiene números." />
+            )
+          }
           refreshControl={
             <RefreshControl
               refreshing={booksQuery.isRefetching}
@@ -454,6 +450,7 @@ const styles = StyleSheet.create({
   genreWrap: { flexDirection: 'row', flexWrap: 'wrap' },
   genreChip: { paddingHorizontal: 10, paddingVertical: 4, marginRight: 6, marginBottom: 6 },
   controlRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  groupTitle: { textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   noteInput: { minHeight: 70, padding: 12, textAlignVertical: 'top' },
   controlChip: { paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, marginBottom: 4 },
 });

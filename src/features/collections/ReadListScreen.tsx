@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
 import { getReadListBooks, updateReadProgress } from '@shared/api/komga';
-import { EmptyState } from '@shared/components';
+import { EmptyState, ErrorState } from '@shared/components';
 import { useTheme } from '@shared/theme';
 import { BookListItem } from '@features/series/components/BookListItem';
 
@@ -89,7 +89,13 @@ export function ReadListScreen({ route, navigation }: Props) {
               }
             />
           )}
-          ListEmptyComponent={<EmptyState message="Esta read list no tiene libros." />}
+          ListEmptyComponent={
+            booksQuery.isError ? (
+              <ErrorState onRetry={() => booksQuery.refetch()} />
+            ) : (
+              <EmptyState message="Esta read list no tiene libros." />
+            )
+          }
         />
       )}
     </View>

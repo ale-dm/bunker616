@@ -7,6 +7,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     setItem: async (key: string, value: string) => {
       mockStore.set(key, value);
     },
+    removeItem: async (key: string) => {
+      mockStore.delete(key);
+    },
   },
 }));
 
@@ -154,5 +157,16 @@ describe('buildReadingGroups', () => {
     const groups = buildReadingGroups([portrait, spread, portrait], false, true, false);
     expect(findSlotGroupIndex(groups, 1)).toBe(1);
     expect(findSlotGroupIndex(groups, 2)).toBe(3);
+  });
+});
+
+describe('pending progress queue', () => {
+  it('keeps only the latest pending progress per book and clears it on success', async () => {
+    const { enqueueProgress, getPendingProgress, discardPendingProgress } = require('../src/features/sync/progressQueue');
+    await enqueueProgress('book-9', { page: 3, completed: false });
+    await enqueueProgress('book-9', { page: 12, completed: false });
+    expect(await getPendingProgress('book-9')).toEqual({ page: 12, completed: false });
+    await discardPendingProgress('book-9');
+    expect(await getPendingProgress('book-9')).toBeUndefined();
   });
 });
