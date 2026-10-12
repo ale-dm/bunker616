@@ -74,3 +74,22 @@ export async function prefetchPages({
     }
   }
 }
+
+const PREFETCH_PREFIX = 'prefetch-';
+
+export async function prefetchCacheBytes(): Promise<number> {
+  const dir = RNBlobUtil.fs.dirs.CacheDir;
+  const names = (await RNBlobUtil.fs.ls(dir)).filter(name => name.startsWith(PREFETCH_PREFIX));
+  let total = 0;
+  for (const name of names) {
+    total += (await RNBlobUtil.fs.stat(`${dir}/${name}`)).size;
+  }
+  return total;
+}
+
+export async function clearPrefetchCache(): Promise<void> {
+  cached.clear();
+  const dir = RNBlobUtil.fs.dirs.CacheDir;
+  const names = (await RNBlobUtil.fs.ls(dir)).filter(name => name.startsWith(PREFETCH_PREFIX));
+  await Promise.all(names.map(name => RNBlobUtil.fs.unlink(`${dir}/${name}`).catch(() => undefined)));
+}

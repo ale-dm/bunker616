@@ -1,8 +1,8 @@
 import { seriesCoverUri } from '@features/library/coverStore';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
@@ -46,6 +46,7 @@ function OnlineHome({ navigation }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
   const columns = useGridColumns();
   const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
   const inProgressQuery = useQuery({
     queryKey: ['home', 'in-progress'],
@@ -186,7 +187,19 @@ function OnlineHome({ navigation }: HomeScreenProps) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.accent}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await queryClient.invalidateQueries({ queryKey: ['home'] });
+              setRefreshing(false);
+            }}
+          />
+        }>
         {heroItem && (
           <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
             <Text style={[typography.headline, { color: colors.label, marginBottom: spacing.sm }]}>Sigue leyendo</Text>

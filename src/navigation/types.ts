@@ -1,4 +1,4 @@
-import type { CompositeScreenProps } from '@react-navigation/native';
+import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -6,18 +6,18 @@ export type TabParamList = {
   HomeTab: undefined;
   // presetGenre permite que Home (u otra pantalla) abra la Biblioteca con
   // un género ya filtrado, imitando los accesos rápidos de Marvel Unlimited.
-  LibraryTab: { presetGenre?: string } | undefined;
+  LibraryTab: { presetGenre?: string; presetAuthor?: string } | undefined;
   SettingsTab: undefined;
 };
 
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParamList> | undefined;
   Series: { seriesId: string; title: string };
   Reader: { bookId: string; title: string; seriesId: string };
   Search: undefined;
   Collection: { collectionId: string; title: string };
   ReadList: { readListId: string; title: string };
-  AddServer: undefined;
+  AddServer: { serverId?: string; baseUrl?: string; email?: string } | undefined;
 };
 
 // LibraryScreen vive dentro del Tab.Navigator pero necesita poder navegar

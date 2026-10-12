@@ -124,6 +124,16 @@ export function SeriesScreen({ route, navigation }: Props) {
     enabled: !!api,
   });
 
+  const continueBook =
+    booksQuery.data?.content.find(book => book.readProgress && !book.readProgress.completed) ??
+    booksQuery.data?.content.find(book => !book.readProgress?.completed);
+
+  const authors = useMemo(() => {
+    const names = new Set<string>();
+    booksQuery.data?.content.forEach(book => book.metadata.authors?.forEach(author => names.add(author.name)));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [booksQuery.data]);
+
   const visibleBooks = useMemo(() => {
     const books = booksQuery.data?.content ?? [];
     const filtered = books.filter(book => {
@@ -294,6 +304,23 @@ export function SeriesScreen({ route, navigation }: Props) {
         </View>
       )}
 
+      {authors.length > 0 && (
+        <View style={{ marginTop: spacing.lg }}>
+          <Text style={[typography.caption, styles.groupTitle, { color: colors.secondaryLabel }]}>AUTORES</Text>
+          <View style={styles.controlRow}>
+            {authors.map(name => (
+              <Chip
+                key={name}
+                label={name}
+                onPress={() =>
+                  navigation.navigate('Tabs', { screen: 'LibraryTab', params: { presetAuthor: name } })
+                }
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
       {!!metadata?.summary && (
         <TouchableOpacity onPress={() => setSummaryExpanded(v => !v)} style={{ marginTop: spacing.md }}>
           <Text
@@ -355,6 +382,18 @@ export function SeriesScreen({ route, navigation }: Props) {
         LECTURA
       </Text>
       <View style={styles.controlRow}>
+        {continueBook && (
+          <Chip
+            label="Continuar"
+            onPress={() =>
+              navigation.navigate('Reader', {
+                bookId: continueBook.id,
+                title: continueBook.metadata.title || continueBook.name,
+                seriesId,
+              })
+            }
+          />
+        )}
         <Chip
           label={seriesMarking ? `Marcando ${seriesMarking.done}/${seriesMarking.total}…` : 'Marcar serie leída'}
           onPress={() => confirmMarkWholeSeries(true)}

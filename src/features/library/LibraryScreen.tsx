@@ -52,6 +52,7 @@ const SECTION_OPTIONS: { value: LibrarySection; label: string }[] = [
 const SORT_OPTIONS: { value: SeriesSort; label: string }[] = [
   { value: 'title', label: 'Título' },
   { value: 'recent', label: 'Recientes' },
+  { value: 'modified', label: 'Actualizadas' },
 ];
 
 const STATUS_OPTIONS: { value: SeriesSearchFilters['status']; label: string }[] = [
@@ -89,6 +90,12 @@ export function LibraryScreen({ navigation, route }: LibraryScreenProps) {
   const [draftStatus, setDraftStatus] = useState<SeriesSearchFilters['status']>(undefined);
 
   const presetGenre = route.params?.presetGenre;
+  const presetAuthor = route.params?.presetAuthor;
+  useEffect(() => {
+    if (presetAuthor) {
+      setAuthor(presetAuthor);
+    }
+  }, [presetAuthor]);
   useEffect(() => {
     if (presetGenre) {
       setGenre(presetGenre);

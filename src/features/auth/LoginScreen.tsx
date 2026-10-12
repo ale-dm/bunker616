@@ -15,13 +15,14 @@ import { useTheme } from '@shared/theme';
 
 interface Props {
   onSuccess?: () => void;
+  editingServer?: { id: string; baseUrl: string; email: string };
 }
 
-export function LoginScreen({ onSuccess }: Props) {
-  const { addServer } = useAuth();
+export function LoginScreen({ onSuccess, editingServer }: Props) {
+  const { addServer, updateServer } = useAuth();
   const { colors, spacing, radii, typography } = useTheme();
-  const [baseUrl, setBaseUrl] = useState('');
-  const [email, setEmail] = useState('');
+  const [baseUrl, setBaseUrl] = useState(editingServer?.baseUrl ?? '');
+  const [email, setEmail] = useState(editingServer?.email ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,12 @@ export function LoginScreen({ onSuccess }: Props) {
     setError(null);
     setLoading(true);
     try {
-      await addServer({ baseUrl: baseUrl.trim(), email: email.trim(), password });
+      const creds = { baseUrl: baseUrl.trim(), email: email.trim(), password };
+      if (editingServer) {
+        await updateServer(editingServer.id, creds);
+      } else {
+        await addServer(creds);
+      }
       onSuccess?.();
     } catch (e: any) {
       const status = e?.response?.status;

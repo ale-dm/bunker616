@@ -2,6 +2,7 @@ import { seriesCoverUri } from '@features/library/coverStore';
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { addSearchTerm, clearSearchHistory, getSearchHistory } from './searchHistory';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@navigation/types';
@@ -20,6 +21,15 @@ export function SearchScreen({ navigation }: Props) {
   const { colors, spacing, radii, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    getSearchHistory().then(setHistory);
+  }, []);
+
+  const remember = (term: string) => {
+    addSearchTerm(term).then(setHistory);
+  };
   const [term, setTerm] = useState('');
 
   useEffect(() => {
@@ -81,6 +91,7 @@ export function SearchScreen({ navigation }: Props) {
           autoFocus
           value={input}
           onChangeText={setInput}
+          onSubmitEditing={() => remember(input)}
           placeholder="Series, números o colecciones"
           placeholderTextColor={colors.tertiaryLabel}
           returnKeyType="search"
@@ -93,7 +104,34 @@ export function SearchScreen({ navigation }: Props) {
       </View>
 
       {!enabled ? (
-        <EmptyState message="Escribe para buscar en tu servidor." />
+        history.length > 0 ? (
+          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+            <View style={styles.historyHeader}>
+              <Text style={[typography.footnote, { color: colors.secondaryLabel }]}>BÚSQUEDAS RECIENTES</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  clearSearchHistory();
+                  setHistory([]);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Borrar búsquedas recientes">
+                <Text style={[typography.footnote, { color: colors.accent }]}>Borrar</Text>
+              </TouchableOpacity>
+            </View>
+            {history.map(item => (
+              <TouchableOpacity
+                key={item}
+                onPress={() => setInput(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Buscar ${item}`}
+                style={styles.historyRow}>
+                <Text style={[typography.body, { color: colors.label }]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <EmptyState message="Escribe para buscar en tu servidor." />
+        )
       ) : isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : searchFailed ? (
@@ -182,6 +220,8 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 8 },
   input: { paddingHorizontal: 14, paddingVertical: 10 },
   loader: { marginTop: 40 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  historyRow: { paddingVertical: 10 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   thumb: { width: 44, aspectRatio: 2 / 3, overflow: 'hidden', marginRight: 12 },
   thumbImage: { width: '100%', height: '100%' },

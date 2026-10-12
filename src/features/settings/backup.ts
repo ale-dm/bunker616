@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBlobUtil from 'react-native-blob-util';
 
-const BACKUP_KEYS = [
+export const BACKUP_KEYS = [
   'bunker616.themePreference',
   'bunker616.readingDirection',
   'bunker616.readerBackground',

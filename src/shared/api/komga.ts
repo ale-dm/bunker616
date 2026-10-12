@@ -89,11 +89,12 @@ export function buildSeriesSearchQuery(filters: SeriesSearchFilters): string {
   return parts.join(' ');
 }
 
-export type SeriesSort = 'title' | 'recent';
+export type SeriesSort = 'title' | 'recent' | 'modified';
 
 const SERIES_SORT_PARAMS: Record<SeriesSort, string> = {
   title: 'metadata.titleSort,asc',
   recent: 'createdDate,desc',
+  modified: 'lastModifiedDate,desc',
 };
 
 export async function getSeriesById(api: AxiosInstance, seriesId: string): Promise<Series> {

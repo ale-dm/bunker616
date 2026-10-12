@@ -98,7 +98,16 @@ export function RootNavigator() {
           <Stack.Screen name="Search" component={SearchScreen} />
           <Stack.Screen name="Reader" component={ReaderScreen} />
           <Stack.Screen name="AddServer" options={{ presentation: 'modal' }}>
-            {({ navigation }) => <LoginScreen onSuccess={() => navigation.goBack()} />}
+            {({ navigation, route }) => (
+              <LoginScreen
+                onSuccess={() => navigation.goBack()}
+                editingServer={
+                  route.params?.serverId
+                    ? { id: route.params.serverId, baseUrl: route.params.baseUrl ?? '', email: route.params.email ?? '' }
+                    : undefined
+                }
+              />
+            )}
           </Stack.Screen>
         </Stack.Navigator>
       )}

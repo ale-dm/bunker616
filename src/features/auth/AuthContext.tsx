@@ -29,6 +29,7 @@ interface AuthContextValue {
   api: AxiosInstance | null;
   error: string | null;
   addServer: (credentials: ServerCredentials) => Promise<void>;
+  updateServer: (id: string, credentials: ServerCredentials) => Promise<void>;
   switchServer: (id: string) => Promise<void>;
   removeServer: (id: string) => Promise<void>;
 }
@@ -98,6 +99,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('signedIn');
   }, []);
 
+  const updateServer = useCallback(async (id: string, creds: ServerCredentials) => {
+    setError(null);
+    // Validar la nueva configuración antes de tocar lo guardado.
+    await getCurrentUser(createApiClient(creds));
+    setServers(prev => {
+      const next = prev.map(s => (s.id === id ? { ...creds, id } : s));
+      writeServers(next);
+      return next;
+    });
+  }, []);
+
   const switchServer = useCallback(async (id: string) => {
     setActiveServerId(id);
     await AsyncStorage.setItem(ACTIVE_SERVER_KEY, id);
@@ -141,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api,
     error,
     addServer,
+    updateServer,
     switchServer,
     removeServer,
   };

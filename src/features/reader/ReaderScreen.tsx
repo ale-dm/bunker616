@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   Alert,
+  PanResponder,
   FlatList,
   Image,
   Modal,
@@ -63,6 +65,8 @@ import {
 } from './readerPrefs';
 import { recordPageTurn } from '@features/history/readingLog';
 
+const GESTURE_HINT_KEY = 'bunker616.gestureHintSeen';
+
 // Colores del lector: siempre sobre fondo oscuro, así que usan la variante oscura del tema.
 const READER_ACCENT = '#0A84FF';
 const READER_HIGHLIGHT = '#FF9F0A';
@@ -99,6 +103,37 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [doublePage, setDoublePage] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>('paged');
   const [saving, setSaving] = useState(false);
+  const [showGestureHints, setShowGestureHints] = useState(false);
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const trackWidthRef = useRef(0);
+  const scrubLatest = useRef({ count: 0, goTo: (_index: number) => {} });
+  const goToPageRef = useRef<(pageIndex: number) => void>(() => {});
+
+  const indexFromX = (x: number) => {
+    const { count } = scrubLatest.current;
+    const width = trackWidthRef.current;
+    if (count <= 1 || width <= 0) {
+      return 0;
+    }
+    const ratio = Math.min(1, Math.max(0, x / width));
+    return Math.round(ratio * (count - 1));
+  };
+
+  const scrubResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: event => setScrubIndex(indexFromX(event.nativeEvent.locationX)),
+      onPanResponderMove: event => setScrubIndex(indexFromX(event.nativeEvent.locationX)),
+      onPanResponderRelease: event => {
+        const index = indexFromX(event.nativeEvent.locationX);
+        setScrubIndex(null);
+        scrubLatest.current.goTo(index);
+      },
+      onPanResponderTerminate: () => setScrubIndex(null),
+    }),
+  ).current;
+
   const [background, setBackground] = useState<ReaderBackground>('black');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [fitMode, setFitModeState] = useState<FitMode>('contain');
@@ -155,6 +190,11 @@ export function ReaderScreen({ route, navigation }: Props) {
   useEffect(() => {
     getBookmarks(bookId).then(setBookmarks);
     getSplitSpreads().then(setSplitSpreadsState);
+    AsyncStorage.getItem(GESTURE_HINT_KEY).then(seen => {
+      if (!seen) {
+        setShowGestureHints(true);
+      }
+    });
     getNightDimmingEnabled().then(enabled => {
       if (enabled && isNightHour()) {
         setDimIndex(2);
@@ -290,6 +330,11 @@ export function ReaderScreen({ route, navigation }: Props) {
     setBookmarks(await getBookmarks(bookId));
   };
 
+  scrubLatest.current = {
+    count: pages.length,
+    goTo: (index: number) => goToPageRef.current(index),
+  };
+
   const goToPage = (pageIndex: number) => {
     if (readerMode === 'paged') {
       pagedRef.current?.goToPage(pageIndex);
@@ -297,6 +342,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       webtoonRef.current?.goToPage(pageIndex);
     }
   };
+  goToPageRef.current = goToPage;
 
   const getPageSource = (page: BookPage): PageSource => {
     if (record) {
@@ -492,12 +538,50 @@ export function ReaderScreen({ route, navigation }: Props) {
                 />
               ))}
             </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
+            {scrubIndex !== null && (
+              <Text style={styles.scrubLabel}>Página {scrubIndex + 1} de {pages.length}</Text>
+            )}
+            <View
+              style={styles.scrubArea}
+              onLayout={event => {
+                trackWidthRef.current = event.nativeEvent.layout.width;
+              }}
+              accessibilityRole="adjustable"
+              accessibilityLabel={`Progreso del número, página ${activeIndex + 1} de ${pages.length}`}
+              {...scrubResponder.panHandlers}>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${(scrubIndex !== null ? (scrubIndex + 1) / Math.max(1, pages.length) : progressRatio) * 100}%`,
+                    },
+                  ]}
+                />
+              </View>
             </View>
             <Text style={styles.timeLeft}>{timeLeftLabel}</Text>
           </View>
         </>
+      )}
+
+      {showGestureHints && (
+        <View style={styles.hintOverlay}>
+          <Text style={styles.hintTitle}>Cómo leer</Text>
+          <Text style={styles.hintLine}>Toca el borde izquierdo o derecho para pasar página.</Text>
+          <Text style={styles.hintLine}>Toca el centro para mostrar u ocultar los controles.</Text>
+          <Text style={styles.hintLine}>Doble toque para ampliar. Pellizca para ajustar el zoom.</Text>
+          <Text style={styles.hintLine}>Arrastra la barra de progreso para saltar de página.</Text>
+          <TouchableOpacity
+            style={styles.hintButton}
+            accessibilityRole="button"
+            onPress={() => {
+              setShowGestureHints(false);
+              AsyncStorage.setItem(GESTURE_HINT_KEY, 'true');
+            }}>
+            <Text style={styles.hintButtonText}>Entendido</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <Modal visible={showInfo} transparent animationType="fade" onRequestClose={() => setShowInfo(false)}>
@@ -690,6 +774,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: READER_ACCENT },
+  scrubArea: { paddingVertical: 12, marginVertical: -12 },
+  scrubLabel: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
+  hintOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+    zIndex: 50,
+  },
+  hintTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 16 },
+  hintLine: { color: '#D1D1D6', fontSize: 15, lineHeight: 22, marginBottom: 10, textAlign: 'center' },
+  hintButton: { marginTop: 20, backgroundColor: READER_ACCENT, borderRadius: 999, paddingHorizontal: 24, paddingVertical: 10 },
+  hintButtonText: { color: '#FFFFFF', fontWeight: '700' },
   timeLeft: { color: '#c7c7d1', fontSize: 11, marginTop: 4, marginBottom: 6 },
   dimOverlay: {
     position: 'absolute',

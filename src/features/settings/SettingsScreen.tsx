@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import pkg from '../../../package.json';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SettingsScreenProps } from '@navigation/types';
 import { useAuth } from '@features/auth/AuthContext';
@@ -13,7 +14,9 @@ import { deleteOfflineBook, formatBytes } from '@features/offline/offlineStore';
 import { getReadStats, ReadStats } from '@features/history/readingLog';
 import { getNightDimmingEnabled, setNightDimmingEnabled } from '@features/reader/readerPrefs';
 import { exportBackup } from './backup';
+import { restoreBackupFromFile } from './restoreBackup';
 import { getOfflineMode, setOfflineMode } from '@features/offline/offlineMode';
+import { clearPrefetchCache, prefetchCacheBytes } from '@features/reader/pagePrefetch';
 import { useOfflineRecords } from '@features/offline/useOfflineBook';
 import { ThemePreference, useTheme } from '@shared/theme';
 
@@ -59,7 +62,12 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [readStats, setReadStats] = useState<ReadStats | null>(null);
   const [nightDimming, setNightDimming] = useState(false);
   const [offlineMode, setOfflineModeState] = useState(false);
+  const [prefetchBytes, setPrefetchBytes] = useState(0);
+  const refreshPrefetchBytes = () => {
+    prefetchCacheBytes().then(setPrefetchBytes).catch(() => setPrefetchBytes(0));
+  };
   useEffect(() => {
+    refreshPrefetchBytes();
     getReadStats().then(setReadStats);
     getNightDimmingEnabled().then(setNightDimming);
     getOfflineMode().then(setOfflineModeState);
@@ -73,6 +81,33 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const onToggleNightDimming = (value: boolean) => {
     setNightDimming(value);
     setNightDimmingEnabled(value);
+  };
+
+  const onImportBackup = () => {
+    Alert.alert(
+      'Importar copia',
+      'Los datos de la copia reemplazarán los ajustes, marcadores, favoritos, listas y notas actuales. ¿Continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Importar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await restoreBackupFromFile();
+              if (result) {
+                Alert.alert(
+                  'Copia importada',
+                  `Se han restaurado ${result.restored} apartados. Cierra y vuelve a abrir la app para aplicar los cambios.`,
+                );
+              }
+            } catch (error) {
+              Alert.alert('No se pudo importar', error instanceof Error ? error.message : 'Error desconocido');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const onExportBackup = async () => {
@@ -136,6 +171,20 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                   {isActive ? ' · Activo' : ''}
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('AddServer', {
+                    serverId: server.id,
+                    baseUrl: server.baseUrl,
+                    email: server.email,
+                  })
+                }
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Editar ${server.baseUrl}`}
+                style={{ marginRight: spacing.md }}>
+                <Text style={[typography.footnote, { color: colors.accent }]}>Editar</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => confirmRemoveServer(server.id, server.baseUrl)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -264,6 +313,11 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
           <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Exportar copia a Descargas</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onImportBackup}
+          style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md, marginTop: spacing.xs }]}>
+          <Text style={[typography.body, { color: colors.accent, fontWeight: '600' }]}>Importar copia desde archivo</Text>
+        </TouchableOpacity>
 
         <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
           DESCARGAS · {formatBytes(offlineBytes)}
@@ -308,6 +362,40 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             </View>
           </>
         )}
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          CACHÉ
+        </Text>
+        <View style={[styles.card, styles.row, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <Text style={[typography.body, { color: colors.label, flex: 1 }]}>
+            Páginas precargadas · {formatBytes(prefetchBytes)}
+          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              await clearPrefetchCache();
+              refreshPrefetchBytes();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Borrar páginas precargadas">
+            <Text style={[typography.body, { color: colors.danger }]}>Borrar</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[typography.footnote, { color: colors.secondaryLabel, marginBottom: spacing.xs, marginTop: spacing.lg }]}>
+          ACERCA DE
+        </Text>
+        <View style={[styles.card, { backgroundColor: colors.secondaryBackground, borderRadius: radii.md }]}>
+          <View style={styles.row}>
+            <Text style={[typography.body, { color: colors.label }]}>Versión</Text>
+            <Text style={[typography.body, { color: colors.secondaryLabel }]}>{pkg.version}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => Linking.openURL('https://github.com/ale-dm/bunker616')}
+            accessibilityRole="link"
+            style={[styles.row, { marginTop: spacing.md }]}>
+            <Text style={[typography.body, { color: colors.accent }]}>Código y licencias en GitHub</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
